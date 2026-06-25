@@ -6,20 +6,21 @@ function msAgo(hours: number): Date {
 
 export function filterEvents(
   events: NewsEvent[],
-  category: NewsCategory | "all",
+  activeLayers: NewsCategory[],
   timeRange: TimeRange,
 ): NewsEvent[] {
-  let filtered = events;
+  // Filter by category
+  let filtered = events.filter((e) => activeLayers.includes(e.category));
 
-  if (category !== "all") {
-    filtered = filtered.filter((e) => e.category === category);
-  }
+  // Filter by time range
+  let hours = 0;
+  if (timeRange === "1h") hours = 1;
+  else if (timeRange === "6h") hours = 6;
+  else if (timeRange === "24h") hours = 24;
+  else if (timeRange === "7d") hours = 24 * 7;
 
-  if (timeRange === "last24h") {
-    const cutoff = msAgo(24);
-    filtered = filtered.filter((e) => new Date(e.publishedAt) >= cutoff);
-  } else if (timeRange === "last7d") {
-    const cutoff = msAgo(24 * 7);
+  if (hours > 0) {
+    const cutoff = msAgo(hours);
     filtered = filtered.filter((e) => new Date(e.publishedAt) >= cutoff);
   }
 
@@ -29,15 +30,31 @@ export function filterEvents(
 export function labelForTimeRange(range: TimeRange): string {
   switch (range) {
     case "all":
-      return "All Time";
-    case "last24h":
+      return "All History";
+    case "1h":
+      return "Last Hour";
+    case "6h":
+      return "Last 6 Hours";
+    case "24h":
       return "Last 24 Hours";
-    case "last7d":
+    case "7d":
       return "Last 7 Days";
   }
 }
 
-export function labelForCategory(cat: NewsCategory | "all"): string {
-  if (cat === "all") return "All Categories";
-  return cat.charAt(0).toUpperCase() + cat.slice(1);
+export function labelForCategory(cat: NewsCategory): string {
+  switch (cat) {
+    case "breaking":
+      return "Breaking News";
+    case "protests":
+      return "Protests & Unrest";
+    case "disasters":
+      return "Natural Disasters";
+    case "politics":
+      return "Geopolitics";
+    case "economy":
+      return "Economy & Finance";
+    case "tech":
+      return "Technology & Cyber";
+  }
 }

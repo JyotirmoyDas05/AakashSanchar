@@ -1,16 +1,17 @@
 export type NewsCategory =
+  | "breaking"
+  | "protests"
+  | "disasters"
   | "politics"
-  | "business"
-  | "tech"
-  | "sports"
-  | "disaster"
-  | "general";
+  | "economy"
+  | "tech";
 
-export type TimeRange = "all" | "last24h" | "last7d";
+export type TimeRange = "1h" | "6h" | "24h" | "7d" | "all";
 
 export interface NewsEvent {
   id: string;
   title: string;
+  description: string;
   source: string;
   category: NewsCategory;
   publishedAt: string;
