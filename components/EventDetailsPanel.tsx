@@ -8,41 +8,35 @@ const CATEGORY_COLORS: Record<
   NewsCategory,
   { text: string; bg: string; border: string; glow: string }
 > = {
-  breaking: {
-    text: "text-rose-400",
-    bg: "bg-rose-500/15",
-    border: "border-rose-500/30",
-    glow: "glow-breaking",
+  news: {
+    text: "text-slate-400",
+    bg: "bg-slate-500/15",
+    border: "border-slate-500/30",
+    glow: "glow-news",
   },
-  protests: {
-    text: "text-orange-400",
-    bg: "bg-orange-500/15",
-    border: "border-orange-500/30",
-    glow: "glow-protests",
-  },
-  disasters: {
+  conflict: {
     text: "text-red-400",
     bg: "bg-red-500/15",
     border: "border-red-500/30",
-    glow: "glow-disasters",
+    glow: "glow-conflict",
   },
-  politics: {
-    text: "text-blue-400",
-    bg: "bg-blue-500/15",
-    border: "border-blue-500/30",
-    glow: "glow-politics",
+  disaster: {
+    text: "text-orange-400",
+    bg: "bg-orange-500/15",
+    border: "border-orange-500/30",
+    glow: "glow-disaster",
   },
-  economy: {
-    text: "text-emerald-400",
-    bg: "bg-emerald-500/15",
-    border: "border-emerald-500/30",
-    glow: "glow-economy",
+  health: {
+    text: "text-purple-400",
+    bg: "bg-purple-500/15",
+    border: "border-purple-500/30",
+    glow: "glow-health",
   },
-  tech: {
+  space: {
     text: "text-cyan-400",
     bg: "bg-cyan-500/15",
     border: "border-cyan-500/30",
-    glow: "glow-tech",
+    glow: "glow-space",
   },
 };
 
@@ -59,7 +53,7 @@ export default function EventDetailsPanel({
 }: EventDetailsPanelProps) {
   if (!event) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-6 text-center border-l border-brand-border bg-[#0d1423]/70 backdrop-blur-md">
+      <div className="flex h-full flex-col items-center justify-center p-6 text-center border-l border-brand-border bg-[#0a0a0a]/90 backdrop-blur-md">
         <svg
           className="h-10 w-10 text-slate-600 mb-3"
           xmlns="http://www.w3.org/2000/svg"
@@ -77,7 +71,7 @@ export default function EventDetailsPanel({
         <span className="font-mono text-xs text-slate-500 tracking-wider">
           NO SEGMENT SELECTED
         </span>
-        <p className="mt-1 text-xs text-slate-600 max-w-[180px]">
+        <p className="mt-1 text-xs text-slate-600 max-w-45">
           Select an incident node on the map grid or search list to inspect
           details.
         </p>
@@ -88,9 +82,9 @@ export default function EventDetailsPanel({
   const styles = CATEGORY_COLORS[event.category];
 
   return (
-    <div className="flex h-full flex-col border-l border-brand-border bg-[#0d1423]/90 backdrop-blur-md text-slate-200">
+    <div className="flex h-full flex-col border-l border-brand-border bg-brand-bg/95 backdrop-blur-md text-slate-200">
       {/* Header bar */}
-      <div className="flex items-center justify-between border-b border-brand-border px-4 py-3">
+      <div className="flex items-center justify-between border-b border-brand-border px-4 py-3 bg-[#0d0d0e]">
         <div className="flex items-center gap-2">
           <div className={`h-2 w-2 rounded-full ${styles.glow} bg-current`} />
           <h2 className="font-mono text-xs font-bold text-slate-400 uppercase tracking-widest">
@@ -140,7 +134,7 @@ export default function EventDetailsPanel({
         </h3>
 
         {/* Description / Summary */}
-        <div className="rounded-lg border border-brand-border bg-[#070b13] p-3">
+        <div className="rounded-lg border border-brand-border bg-[#0a0a0a] p-3">
           <span className="font-mono text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1">
             Summary Brief
           </span>
@@ -204,17 +198,15 @@ export default function EventDetailsPanel({
             <div className="h-2 rounded bg-brand-border overflow-hidden">
               <div
                 className={`h-full rounded transition-all duration-500 ${
-                  event.category === "breaking"
-                    ? "bg-rose-500"
-                    : event.category === "protests"
-                      ? "bg-orange-500"
-                      : event.category === "disasters"
-                        ? "bg-red-500"
-                        : event.category === "politics"
-                          ? "bg-blue-500"
-                          : event.category === "economy"
-                            ? "bg-emerald-500"
-                            : "bg-cyan-500"
+                  event.category === "news"
+                    ? "bg-slate-400"
+                    : event.category === "conflict"
+                      ? "bg-red-500"
+                      : event.category === "disaster"
+                        ? "bg-orange-500"
+                        : event.category === "health"
+                          ? "bg-purple-500"
+                          : "bg-cyan-500"
                 }`}
                 style={{ width: `${event.intensity * 100}%` }}
               />
@@ -229,7 +221,7 @@ export default function EventDetailsPanel({
           <button
             type="button"
             onClick={() => onFocusOnMap([event.lat, event.lng])}
-            className="w-full flex items-center justify-center gap-2 rounded border border-[#2b3e63] bg-brand-border/40 py-2 font-mono text-[11px] font-bold text-slate-300 hover:text-white hover:bg-brand-border/80 transition-all active:scale-98"
+            className="w-full flex items-center justify-center gap-2 rounded border border-[#333] bg-[#0d0d0e] py-2 font-mono text-[11px] font-bold text-slate-300 hover:text-white hover:bg-brand-border/80 transition-all active:scale-98"
           >
             <svg
               className="h-3.5 w-3.5 text-cyan-500"

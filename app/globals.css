@@ -6,20 +6,19 @@
     var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, monospace;
 
-  --color-brand-bg: #060913;
-  --color-brand-panel: rgba(13, 20, 35, 0.85);
-  --color-brand-border: #1a263e;
-  --color-brand-border-glow: #2b3e63;
-  --color-brand-text-primary: #f8fafc;
-  --color-brand-text-secondary: #94a3b8;
-  --color-brand-text-muted: #64748b;
+  --color-brand-bg: #030303;
+  --color-brand-panel: rgba(13, 13, 14, 0.85);
+  --color-brand-border: #1a1a1a;
+  --color-brand-border-glow: #333333;
+  --color-brand-text-primary: #f3f4f6;
+  --color-brand-text-secondary: #9ca3af;
+  --color-brand-text-muted: #4b5563;
 
-  --color-cat-breaking: #f43f5e;
-  --color-cat-protests: #f97316;
-  --color-cat-disasters: #ef4444;
-  --color-cat-politics: #3b82f6;
-  --color-cat-economy: #10b981;
-  --color-cat-tech: #06b6d4;
+  --color-cat-news: #9ca3af;
+  --color-cat-conflict: #ef4444;
+  --color-cat-disaster: #f97316;
+  --color-cat-health: #a855f7;
+  --color-cat-space: #06b6d4;
 }
 
 :root {
@@ -28,72 +27,197 @@
   color-scheme: dark;
 }
 
+[data-theme="light"] {
+  --color-brand-bg: #f8fafc;
+  --color-brand-panel: rgba(255, 255, 255, 0.95);
+  --color-brand-border: #e2e8f0;
+  --color-brand-border-glow: #cbd5e1;
+  --color-brand-text-primary: #0f172a;
+  --color-brand-text-secondary: #475569;
+  --color-brand-text-muted: #64748b;
+  color-scheme: light;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
 body {
   font-family: var(--font-sans);
   overflow: hidden;
 }
 
-/* Custom Scrollbar for Dark Tactical Feel */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Custom Scrollbar */
+::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(6, 9, 19, 0.5);
+::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track {
+  background: #030303;
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--color-brand-border);
-  border-radius: 3px;
+[data-theme="light"] ::-webkit-scrollbar-track,
+[data-theme="light"] *::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-brand-border-glow);
+::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb {
+  background: #1e1e1e;
+  border-radius: 2px;
 }
 
-/* Custom Neon Glow Styles */
-.glow-breaking {
-  box-shadow: 0 0 12px rgba(244, 63, 94, 0.35);
-  border: 1px solid rgba(244, 63, 94, 0.5);
+[data-theme="light"] ::-webkit-scrollbar-thumb,
+[data-theme="light"] *::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+  border-radius: 2px !important;
 }
 
-.glow-protests {
-  box-shadow: 0 0 12px rgba(249, 115, 22, 0.35);
-  border: 1px solid rgba(249, 115, 22, 0.5);
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover,
+[data-theme="light"] *::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
 }
 
-.glow-disasters {
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
-  border: 1px solid rgba(239, 68, 68, 0.5);
+/* Scanlines and Noise placeholders for live screens */
+.bg-scanlines {
+  background:
+    linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+    linear-gradient(
+      90deg,
+      rgba(255, 0, 0, 0.06),
+      rgba(0, 255, 0, 0.02),
+      rgba(0, 0, 255, 0.06)
+    );
+  background-size:
+    100% 4px,
+    6px 100%;
 }
 
-.glow-politics {
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
-  border: 1px solid rgba(59, 130, 246, 0.5);
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
-.glow-economy {
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
-  border: 1px solid rgba(16, 185, 129, 0.5);
+/* Category Glow effects matching World Monitor indicators */
+.glow-news {
+  box-shadow: 0 0 8px rgba(156, 163, 175, 0.4);
+}
+.glow-conflict {
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+.glow-disaster {
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
+}
+.glow-health {
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
+}
+.glow-space {
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
 }
 
-.glow-tech {
-  box-shadow: 0 0 12px rgba(6, 182, 212, 0.35);
-  border: 1px solid rgba(6, 182, 212, 0.5);
+/* Custom Leaflet MarkerCluster Styling matching World Monitor */
+.custom-cluster-icon {
+  background: transparent !important;
+  border: none !important;
+  overflow: visible !important;
 }
 
-/* Glassmorphism Presets */
-.glass-panel {
-  background: var(--color-brand-panel);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--color-brand-border);
+.custom-cluster-icon .cluster-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
 }
 
-/* Leaflet Overrides for Dark Map theme */
+.custom-cluster-icon .cluster-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  z-index: 1;
+}
+
+.custom-cluster-icon .cluster-label {
+  position: relative;
+  z-index: 10;
+  font-family: var(--font-mono), monospace;
+  font-weight: 800;
+  font-size: 10px;
+}
+
+/* 1. Green (Health / Outbreaks) */
+.custom-cluster-icon.cluster-green .cluster-bg {
+  background-color: #10b981 !important; /* emerald green */
+  box-shadow: 0 0 15px 5px rgba(16, 185, 129, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.custom-cluster-icon.cluster-green .cluster-label {
+  color: #042f1a !important; /* dark green text for readability */
+}
+
+/* 2. Yellow (Conflict / Disasters) */
+.custom-cluster-icon.cluster-yellow .cluster-bg {
+  background-color: #eab308 !important; /* amber yellow */
+  box-shadow: 0 0 15px 5px rgba(234, 179, 8, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.custom-cluster-icon.cluster-yellow .cluster-label {
+  color: #451a03 !important; /* dark brown/yellow text for readability */
+}
+
+/* 3. Cyan (General News / Space / Cyber) */
+.custom-cluster-icon.cluster-cyan .cluster-bg {
+  background-color: #06b6d4 !important; /* neon cyan */
+  box-shadow: 0 0 15px 5px rgba(6, 182, 212, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.custom-cluster-icon.cluster-cyan .cluster-label {
+  color: #083344 !important; /* dark cyan/blue text for readability */
+}
+
+/* Spiderfied Cluster & Spider Leg Styling */
+.custom-cluster-icon.leaflet-cluster-spiderified {
+  opacity: 0.35 !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s ease;
+}
+
+.leaflet-marker-cluster-spider-leg {
+  stroke: rgba(6, 182, 212, 0.45) !important;
+  stroke-width: 1.5px !important;
+  stroke-dasharray: 3, 3;
+}
+
+/* Marquee scrolling keyframes for breaking wire */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: inline-flex;
+  animation: marquee 45s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Custom Leaflet Map styling overrides */
 .leaflet-container {
-  background: var(--color-brand-bg) !important;
+  background: #262626 !important;
   font-family: var(--font-sans) !important;
+}
+
+[data-theme="light"] .leaflet-container {
+  background: #f1f5f9 !important;
 }
 
 .leaflet-bar {
@@ -102,45 +226,98 @@ body {
 }
 
 .leaflet-bar a {
-  background-color: var(--color-brand-panel) !important;
+  background-color: #0d0d0e !important;
   color: var(--color-brand-text-primary) !important;
   border-bottom: 1px solid var(--color-brand-border) !important;
   transition: all 150ms ease;
 }
 
+[data-theme="light"] .leaflet-bar a {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
 .leaflet-bar a:hover {
-  background-color: var(--color-brand-border) !important;
+  background-color: #1e1e1e !important;
   color: #fff !important;
 }
 
+[data-theme="light"] .leaflet-bar a:hover {
+  background-color: #f1f5f9 !important;
+  color: #0284c7 !important;
+}
+
 .leaflet-popup-content-wrapper {
-  background: var(--color-brand-panel) !important;
+  background: rgba(13, 13, 14, 0.95) !important;
   color: var(--color-brand-text-primary) !important;
   border: 1px solid var(--color-brand-border) !important;
-  backdrop-filter: blur(12px) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(8px) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8) !important;
+}
+
+[data-theme="light"] .leaflet-popup-content-wrapper {
+  background: rgba(255, 255, 255, 0.98) !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
 }
 
 .leaflet-popup-tip {
-  background: var(--color-brand-panel) !important;
+  background: #0d0d0e !important;
   border: 1px solid var(--color-brand-border) !important;
+}
+
+[data-theme="light"] .leaflet-popup-tip {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
 }
 
 .leaflet-tooltip {
-  background: #0d1423 !important;
-  color: #f8fafc !important;
+  background: #0d0d0e !important;
+  color: #ffffff !important;
   border: 1px solid var(--color-brand-border) !important;
-  border-radius: 4px !important;
-  font-size: 11px !important;
-  font-weight: 500 !important;
-  padding: 4px 8px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  border-radius: 2px !important;
+  font-size: 10px !important;
+  font-family: var(--font-mono) !important;
+  padding: 3px 6px !important;
 }
 
-/* Fade animation for panels */
-.panel-transition {
-  transition:
-    transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 300ms cubic-bezier(0.16, 1, 0.3, 1);
+[data-theme="light"] .leaflet-tooltip {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Emil Kowalski motion design ease-out pop and backdrop animations */
+@keyframes modalPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-pop {
+  animation: modalPop 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes backdropFade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-backdrop-fade {
+  animation: backdropFade 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity;
 }

@@ -1,196 +1,258 @@
 "use client";
 
-import { labelForCategory } from "@/lib/filterEvents";
-import type { NewsCategory } from "@/types/news";
+import type React from "react";
 
 interface LeftControlRailProps {
-  activeLayers: NewsCategory[];
-  onToggleLayer: (category: NewsCategory) => void;
-  onToggleAll: (enable: boolean) => void;
-  visualMode: "nodes" | "heat";
-  onChangeVisualMode: (mode: "nodes" | "heat") => void;
-  onOpenSearch: () => void;
-  eventsCountByCategory: Record<NewsCategory, number>;
+  activeWidgets: string[];
+  onToggleWidget: (widget: string) => void;
+  layoutMode?: "sidebar" | "floating";
+  theme?: "dark" | "light";
 }
 
-const CATEGORIES: {
-  id: NewsCategory;
+interface WidgetItem {
+  id: string;
   label: string;
-  color: string;
-  ringColor: string;
-}[] = [
-  {
-    id: "breaking",
-    label: "Breaking",
-    color: "bg-cat-breaking",
-    ringColor: "glow-breaking",
-  },
-  {
-    id: "protests",
-    label: "Protests",
-    color: "bg-cat-protests",
-    ringColor: "glow-protests",
-  },
-  {
-    id: "disasters",
-    label: "Disasters",
-    color: "bg-cat-disasters",
-    ringColor: "glow-disasters",
-  },
-  {
-    id: "politics",
-    label: "Politics",
-    color: "bg-cat-politics",
-    ringColor: "glow-politics",
-  },
-  {
-    id: "economy",
-    label: "Economy",
-    color: "bg-cat-economy",
-    ringColor: "glow-economy",
-  },
-  {
-    id: "tech",
-    label: "Tech / Cyber",
-    color: "bg-cat-tech",
-    ringColor: "glow-tech",
-  },
-];
+  shortcut: string;
+  icon: React.ReactNode;
+}
 
 export default function LeftControlRail({
-  activeLayers,
-  onToggleLayer,
-  onToggleAll,
-  visualMode,
-  onChangeVisualMode,
-  onOpenSearch,
-  eventsCountByCategory,
+  activeWidgets,
+  onToggleWidget,
+  layoutMode = "sidebar",
+  theme = "dark",
 }: LeftControlRailProps) {
-  const allEnabled = activeLayers.length === CATEGORIES.length;
+  const isLight = theme === "light";
 
-  return (
-    <div className="flex h-full w-[240px] flex-col border-r border-brand-border bg-[#070b13] p-4 text-slate-300 select-none">
-      {/* Search Trigger widget */}
-      <button
-        type="button"
-        onClick={onOpenSearch}
-        className="mb-4 flex items-center justify-between w-full rounded border border-brand-border bg-[#0d1423]/70 px-3 py-2 text-left font-mono text-[11px] hover:bg-brand-border transition-colors hover:border-brand-border-glow group"
-      >
-        <span className="text-slate-400 group-hover:text-white transition-colors">
-          SEARCH COMMANDS
-        </span>
-        <span className="rounded bg-brand-border border border-slate-700 px-1 py-0.5 text-[9px] text-slate-500 font-bold group-hover:text-slate-300">
-          ⌘K
-        </span>
-      </button>
-
-      {/* Title */}
-      <div className="mb-2 flex items-center justify-between px-1">
-        <span className="font-mono text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-          TELEMETER LAYERS
-        </span>
-        <button
-          type="button"
-          onClick={() => onToggleAll(!allEnabled)}
-          className="font-mono text-[9px] text-cyan-500 hover:text-cyan-400 font-bold uppercase transition-colors"
+  const widgets: WidgetItem[] = [
+    {
+      id: "wire",
+      label: "WIRE",
+      shortcut: "1",
+      icon: (
+        <svg
+          className="h-4 w-4 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
         >
-          {allEnabled ? "DESELECT ALL" : "SELECT ALL"}
-        </button>
-      </div>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"
+          />
+        </svg>
+      ),
+    },
+    {
+      id: "stocks",
+      label: "STOCKS",
+      shortcut: "2",
+      icon: (
+        <svg
+          className="h-4 w-4 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <rect
+            x="4"
+            y="10"
+            width="6"
+            height="8"
+            rx="1.5"
+            strokeLinecap="round"
+          />
+          <rect
+            x="14"
+            y="7"
+            width="6"
+            height="8"
+            rx="1.5"
+            strokeLinecap="round"
+          />
+          <path d="M7 6v4" strokeLinecap="round" />
+          <path d="M17 3v4" strokeLinecap="round" />
+          <path d="M7 18v3" strokeLinecap="round" />
+          <path d="M17 15v4" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    {
+      id: "streams",
+      label: "STREAMS",
+      shortcut: "3",
+      icon: (
+        <svg
+          className="h-4 w-4 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <rect
+            x="3"
+            y="8"
+            width="18"
+            height="13"
+            rx="2"
+            ry="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <polyline
+            points="16 3 12 8 8 3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+    {
+      id: "cameras",
+      label: "CAMERAS",
+      shortcut: "4",
+      icon: (
+        <svg
+          className="h-4 w-4 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
+        </svg>
+      ),
+    },
+    {
+      id: "outbreaks",
+      label: "OUTBREAKS",
+      shortcut: "5",
+      icon: (
+        <svg
+          className="h-4 w-4 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+          />
+        </svg>
+      ),
+    },
+  ];
 
-      {/* Layers list */}
-      <div className="space-y-1.5 flex-1 overflow-y-auto pr-1">
-        {CATEGORIES.map((cat) => {
-          const isActive = activeLayers.includes(cat.id);
-          const count = eventsCountByCategory[cat.id] || 0;
-
+  // 1. Floating Rail Mode (World Monitor style)
+  if (layoutMode === "floating") {
+    return (
+      <div
+        className={`absolute left-4 bottom-4 z-1050 flex flex-col gap-1 p-1.5 rounded-lg border backdrop-blur-md w-37.5 font-mono select-none transition-all duration-200 ${
+          isLight
+            ? "border-cyan-400/40 bg-white/95 text-slate-800 shadow-xl"
+            : "border-cyan-500/25 bg-[#0a0a0c]/90 text-slate-300 shadow-2xl"
+        }`}
+      >
+        {widgets.map((w) => {
+          const isActive = activeWidgets.includes(w.id);
           return (
             <button
-              key={cat.id}
+              key={w.id}
               type="button"
-              onClick={() => onToggleLayer(cat.id)}
-              className={`flex w-full items-center justify-between rounded border p-2 text-left transition-all duration-150 ${
+              onClick={() => onToggleWidget(w.id)}
+              className={`relative flex h-8 w-full items-center justify-between px-2.5 rounded transition-all group border font-mono text-[10px] tracking-wider uppercase ${
                 isActive
-                  ? "bg-[#0f192b] border-[#223555] text-white shadow-inner"
-                  : "bg-transparent border-transparent hover:bg-brand-border/40 text-slate-400"
+                  ? isLight
+                    ? "bg-cyan-100 border-cyan-500 text-cyan-900 font-bold shadow-sm"
+                    : "bg-cyan-500/20 border-cyan-500 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)]"
+                  : isLight
+                    ? "bg-transparent border-transparent text-slate-700 hover:bg-cyan-50 hover:border-cyan-300 hover:text-cyan-800"
+                    : "bg-transparent border-transparent text-slate-400 hover:bg-cyan-500/10 hover:border-cyan-500/40 hover:text-cyan-300"
               }`}
+              title={`${w.label} (Alt + ${w.shortcut})`}
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                {/* Indicator dot */}
-                <div
-                  className={`h-2.5 w-2.5 shrink-0 rounded-full transition-all duration-300 ${
+              <div className="flex items-center gap-2">
+                <span
+                  className={
                     isActive
-                      ? `${cat.color} ${cat.ringColor}`
-                      : "bg-slate-700 shadow-none"
-                  }`}
-                />
-                <span className="truncate text-xs font-semibold uppercase tracking-wider">
-                  {labelForCategory(cat.id)}
+                      ? isLight
+                        ? "text-cyan-700 font-bold"
+                        : "text-cyan-400"
+                      : isLight
+                        ? "text-slate-600 group-hover:text-cyan-700"
+                        : "text-slate-400 group-hover:text-cyan-300"
+                  }
+                >
+                  {w.icon}
                 </span>
+                <span className="font-bold hidden md:inline">{w.label}</span>
               </div>
-
-              {/* Badge count */}
-              <span
-                className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${
-                  isActive
-                    ? "bg-[#182944]/55 border-[#2c4772]/70 text-slate-200"
-                    : "bg-transparent border-transparent text-slate-600"
-                }`}
-              >
-                {count}
+              <span className="hidden md:inline text-[9px] tabular-nums text-slate-500 opacity-60 group-hover:opacity-100 transition-opacity">
+                {w.shortcut}
               </span>
+              {/* Mobile Active Indicator Dot */}
+              {isActive && (
+                <div className="md:hidden absolute -bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
+              )}
             </button>
           );
         })}
       </div>
+    );
+  }
 
-      {/* Visual Modes and Settings at the bottom */}
-      <div className="mt-4 border-t border-brand-border pt-4 space-y-3">
-        <div>
-          <span className="font-mono text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-2 px-1">
-            VISUALIZATION STYLE
-          </span>
-          <div className="grid grid-cols-2 gap-1 rounded bg-[#0d1423] p-1 border border-brand-border">
+  // 2. Fixed Sidebar Mode (Classic style)
+  return (
+    <div
+      className={`flex h-full w-14 flex-col items-center py-3 border-r select-none shrink-0 z-1050 transition-all duration-300 ease-in-out ${
+        isLight
+          ? "bg-white border-slate-200 text-slate-700 shadow-md"
+          : "bg-[#0a0a0a] border-brand-border text-slate-400"
+      }`}
+    >
+      {/* Widgets list stack */}
+      <div className="flex flex-col gap-3.5 flex-1 items-center w-full">
+        {widgets.map((w) => {
+          const isActive = activeWidgets.includes(w.id);
+          return (
             <button
+              key={w.id}
               type="button"
-              onClick={() => onChangeVisualMode("nodes")}
-              className={`rounded py-1.5 font-mono text-[10px] font-bold uppercase transition-all ${
-                visualMode === "nodes"
-                  ? "bg-brand-border text-white shadow"
-                  : "text-slate-500 hover:text-slate-300"
+              onClick={() => onToggleWidget(w.id)}
+              className={`relative flex h-10 w-10 items-center justify-center rounded transition-all group ${
+                isActive
+                  ? isLight
+                    ? "bg-cyan-50 text-cyan-800 border border-cyan-400 shadow-sm font-bold"
+                    : "bg-[#18181b] text-cyan-400 border border-[#333]"
+                  : isLight
+                    ? "hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-transparent"
+                    : "hover:bg-[#121214] text-slate-500 hover:text-slate-200 border border-transparent"
               }`}
+              title={w.label}
             >
-              NODES
+              {w.icon}
+              {/* Tooltip hint */}
+              <div
+                className={`absolute left-12 scale-0 group-hover:scale-100 transition-transform origin-left z-50 text-[9px] font-bold tracking-wider rounded px-2 py-1 uppercase whitespace-nowrap border ${
+                  isLight
+                    ? "bg-white border-slate-300 text-slate-800 shadow-lg"
+                    : "bg-[#0d0d0e] border-[#222] text-slate-300 shadow-xl"
+                }`}
+              >
+                {w.label}
+              </div>
             </button>
-            <button
-              type="button"
-              onClick={() => onChangeVisualMode("heat")}
-              className={`rounded py-1.5 font-mono text-[10px] font-bold uppercase transition-all ${
-                visualMode === "heat"
-                  ? "bg-brand-border text-white shadow"
-                  : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              HEATMAP
-            </button>
-          </div>
-        </div>
-
-        {/* Telemetry info */}
-        <div className="rounded border border-brand-border bg-[#070b13] p-2 font-mono text-[9px] text-slate-500 space-y-1">
-          <div className="flex justify-between">
-            <span>GRID DEPLOYMENT:</span>
-            <span className="text-slate-400">NEXT16/TS</span>
-          </div>
-          <div className="flex justify-between">
-            <span>MAP ENGINE:</span>
-            <span className="text-slate-400">LEAFLET v1.9</span>
-          </div>
-          <div className="flex justify-between">
-            <span>PING RANGE:</span>
-            <span className="text-emerald-500">22MS (ONLINE)</span>
-          </div>
-        </div>
+          );
+        })}
       </div>
     </div>
   );

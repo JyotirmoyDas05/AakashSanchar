@@ -44,17 +44,15 @@ export function labelForTimeRange(range: TimeRange): string {
 
 export function labelForCategory(cat: NewsCategory): string {
   switch (cat) {
-    case "breaking":
-      return "Breaking News";
-    case "protests":
-      return "Protests & Unrest";
-    case "disasters":
-      return "Natural Disasters";
-    case "politics":
-      return "Geopolitics";
-    case "economy":
-      return "Economy & Finance";
-    case "tech":
-      return "Technology & Cyber";
+    case "news":
+      return "News";
+    case "conflict":
+      return "Conflict";
+    case "disaster":
+      return "Disaster";
+    case "health":
+      return "Health";
+    case "space":
+      return "Space";
   }
 }

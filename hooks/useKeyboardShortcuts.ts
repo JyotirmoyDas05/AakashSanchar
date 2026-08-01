@@ -6,12 +6,24 @@ interface ShortcutsProps {
   onSearchToggle: () => void;
   onLayersToggle: () => void;
   onCloseActivePanel: () => void;
+  onWidgetToggle?: (widgetId: string) => void;
+  onSettingsToggle?: () => void;
 }
+
+const WIDGET_KEY_MAP: Record<string, string> = {
+  "1": "wire",
+  "2": "stocks",
+  "3": "streams",
+  "4": "cameras",
+  "5": "outbreaks",
+};
 
 export function useKeyboardShortcuts({
   onSearchToggle,
   onLayersToggle,
   onCloseActivePanel,
+  onWidgetToggle,
+  onSettingsToggle,
 }: ShortcutsProps) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -36,6 +48,20 @@ export function useKeyboardShortcuts({
         return;
       }
 
+      // Alt + [1-7] for Widget shortcuts
+      if (e.altKey && WIDGET_KEY_MAP[e.key] && onWidgetToggle) {
+        e.preventDefault();
+        onWidgetToggle(WIDGET_KEY_MAP[e.key]);
+        return;
+      }
+
+      // Alt + S for Settings shortcut
+      if (e.altKey && e.key.toLowerCase() === "s" && onSettingsToggle) {
+        e.preventDefault();
+        onSettingsToggle();
+        return;
+      }
+
       // If user is focused on an input, do not trigger single-letter shortcuts
       if (isInput) return;
 
@@ -56,5 +82,11 @@ export function useKeyboardShortcuts({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onSearchToggle, onLayersToggle, onCloseActivePanel]);
+  }, [
+    onSearchToggle,
+    onLayersToggle,
+    onCloseActivePanel,
+    onWidgetToggle,
+    onSettingsToggle,
+  ]);
 }

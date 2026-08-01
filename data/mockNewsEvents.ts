@@ -5,314 +5,221 @@ function ago(hours: number): string {
 }
 
 export const mockNewsEvents: NewsEvent[] = [
-  // ── BREAKING NEWS (Electric Fuchsia) ──
+  // ── CONFLICTS (Red / Orange) ──
   {
-    id: "ev-break-1",
-    title: "Critical Vulnerability Discovered in Global DNS Infrastructure",
+    id: "ev-con-1",
+    title: "Maritime Security Alert: Vessel Boarded in Strait of Hormuz",
     description:
-      "A zero-day exploit targeting BIND9 servers has been disclosed, allowing remote cache poisoning. Cybersecurity agencies worldwide have issued urgent patch mandates.",
-    source: "CyberDefense Agency",
-    category: "breaking",
-    publishedAt: ago(0.4), // 24m ago
-    locationName: "New Delhi, Delhi",
-    lat: 28.6139,
-    lng: 77.209,
+      "A commercial tanker sailing under a panamanian flag was boarded by armed personnel in international waters. Coastal patrols are responding.",
+    source: "Gulf Intel Group",
+    category: "conflict",
+    publishedAt: ago(0.3), // 18m ago
+    locationName: "Strait of Hormuz",
+    lat: 26.5667,
+    lng: 56.25,
     intensity: 0.95,
   },
   {
-    id: "ev-break-2",
-    title: "Emergency Port Lockout Halts Maritime Operations",
+    id: "ev-con-2",
+    title: "Artillery Shelling Reported Near Zaporizhzhia Substation",
     description:
-      "A sudden grid outage at the Nhava Sheva port facility has frozen container tracking systems. Cargo vessels are stranded anchor-side off the Mumbai harbor.",
-    source: "Maritime Log",
-    category: "breaking",
-    publishedAt: ago(0.8), // 48m ago
-    locationName: "Navi Mumbai, Maharashtra",
-    lat: 18.95,
-    lng: 72.95,
+      "Local monitoring units reported heavy artillery detonations within 2km of the electrical switch yard. Nuclear sensors show normal baseline radiation.",
+    source: "EU OSINT Wire",
+    category: "conflict",
+    publishedAt: ago(1.2), // 1.2h ago
+    locationName: "Zaporizhzhia, Ukraine",
+    lat: 47.508,
+    lng: 35.118,
     intensity: 0.9,
   },
   {
-    id: "ev-break-3",
-    title: "Central Bank Announces Emergency Inter-Bank Liquidity Injection",
+    id: "ev-con-3",
+    title: "Border Skirmish Detonates Along Southern Frontier Lines",
     description:
-      "Following a sudden foreign capital outflow, the Reserve Bank of India has opened an overnight liquidity window to stabilize short-term call rates.",
-    source: "Financial Bulletin",
-    category: "breaking",
-    publishedAt: ago(1.5), // 1.5h ago
-    locationName: "Mumbai, Maharashtra",
-    lat: 19.076,
-    lng: 72.8777,
-    intensity: 0.88,
-  },
-
-  // ── PROTESTS (Safety Orange) ──
-  {
-    id: "ev-prot-1",
-    title: "Logistics Workers Strike Blocks Major Inner-Ring Expressways",
-    description:
-      "Thousands of transport workers have blockaded key entry lanes of the Outer Ring Road in Bengaluru, demanding digital freight-matching platform rate regulation.",
-    source: "City Logistics Tracker",
-    category: "protests",
-    publishedAt: ago(2.2), // 2.2h ago
-    locationName: "Bengaluru, Karnataka",
-    lat: 12.9716,
-    lng: 77.5946,
-    intensity: 0.76,
+      "Border forces exchanged brief small-arms fire near rural verification posts. Diplomatic contact initiated to coordinate ceasefire terms.",
+    source: "Middle East Live",
+    category: "conflict",
+    publishedAt: ago(5.0), // 5h ago
+    locationName: "Tehran Frontier, Iran",
+    lat: 35.6892,
+    lng: 51.389,
+    intensity: 0.72,
   },
   {
-    id: "ev-prot-2",
-    title: "Farmers Assembly Gathers Near Highway Toll Booths",
+    id: "ev-con-4",
+    title: "Clashes Erupt in Central Administrative District",
     description:
-      "Farmer unions have launched sit-ins at toll plazas along the Delhi-Noida Expressway, demanding minimum support price assurances on oilseeds.",
-    source: "NCR Commute Live",
-    category: "protests",
-    publishedAt: ago(4.5), // 4.5h ago
-    locationName: "Noida, Uttar Pradesh",
-    lat: 28.5355,
-    lng: 77.391,
-    intensity: 0.7,
-  },
-  {
-    id: "ev-prot-3",
-    title: "Public Demonstration Against Water Allocation Cutbacks",
-    description:
-      "Civic groups have gathered outside municipal offices in Chennai protesting water supply reductions to outlying residential sectors.",
-    source: "Madras Tribune",
-    category: "protests",
+      "Protesters clashed with security guards outside ministry gates following a sudden national decree restricting local currency conversions.",
+    source: "Caracas Tribune",
+    category: "conflict",
     publishedAt: ago(18.0), // 18h ago
-    locationName: "Chennai, Tamil Nadu",
-    lat: 13.0827,
-    lng: 80.2707,
-    intensity: 0.65,
-  },
-  {
-    id: "ev-prot-4",
-    title: "Dockworkers Stoppage Slows Container Unloading",
-    description:
-      "Port workers in Kolkata have started a 24-hour token strike demanding improved shifts and healthcare coverage during seasonal monsoons.",
-    source: "Eastern Shipping News",
-    category: "protests",
-    publishedAt: ago(48.0), // 2d ago
-    locationName: "Kolkata, West Bengal",
-    lat: 22.5726,
-    lng: 88.3639,
-    intensity: 0.58,
+    locationName: "Caracas, Venezuela",
+    lat: 10.5,
+    lng: -66.903,
+    intensity: 0.81,
   },
 
-  // ── DISASTERS (Crimson Red) ──
+  // ── DISASTERS (Red) ──
   {
     id: "ev-dis-1",
-    title: "Severe Urban Inundation After Record Pre-Monsoon Downpour",
+    title: "Magnitude 6.2 Earthquake Strikes Coastal Trench Line",
     description:
-      "A sudden cloudburst has released 110mm of rainfall in under 3 hours. Whitefield, Indiranagar, and Bellandur roads are experiencing severe waterlogging and power outages.",
-    source: "Met Forecast India",
-    category: "disasters",
-    publishedAt: ago(3.0), // 3h ago
-    locationName: "Bengaluru, Karnataka",
-    lat: 12.982,
-    lng: 77.751,
-    intensity: 0.85,
+      "A shallow seismic shift at a depth of 12km triggered strong tremors. Buildings cracked, and structural checks are active across coastal ports.",
+    source: "Seismic Monitor",
+    category: "disaster",
+    publishedAt: ago(0.6), // 36m ago
+    locationName: "Caracas Coast, Venezuela",
+    lat: 10.6,
+    lng: -66.8,
+    intensity: 0.88,
   },
   {
     id: "ev-dis-2",
-    title: "Industrial Storage Facility Chemical Spill",
+    title: "Wildfire Incursions Damage Northern High-Voltage Lines",
     description:
-      "A tank leak at an chemical depot near the outer harbor has prompted local containment procedures. Air monitoring units show minor, localized organic vapours.",
-    source: "Environment Watch",
-    category: "disasters",
-    publishedAt: ago(11.2), // 11.2h ago
-    locationName: "Visakhapatnam, Andhra Pradesh",
-    lat: 17.6868,
-    lng: 83.2185,
-    intensity: 0.78,
-  },
-  {
-    id: "ev-dis-3",
-    title: "Moderate Earth Tremor Recorded in Himalayan Foothills",
-    description:
-      "An earthquake of magnitude 4.8 occurred at a depth of 10km. Minor cracks reported in masonry structures in Shimla and adjoining mountain towns.",
-    source: "Geological Survey",
-    category: "disasters",
-    publishedAt: ago(36.0), // 1.5d ago
-    locationName: "Shimla, Himachal Pradesh",
-    lat: 31.1048,
-    lng: 77.1734,
-    intensity: 0.72,
-  },
-  {
-    id: "ev-dis-4",
-    title: "River Embankment Erosion Floods Low-lying Farmland",
-    description:
-      "Recent surges in water release from northern reservoirs have breached a 50-meter section of the rural embankment, displacing agricultural communities.",
-    source: "Assam Daily News",
-    category: "disasters",
-    publishedAt: ago(120.0), // 5d ago
-    locationName: "Guwahati, Assam",
-    lat: 26.1445,
-    lng: 91.7362,
-    intensity: 0.64,
-  },
-
-  // ── POLITICS (Royal Blue) ──
-  {
-    id: "ev-pol-1",
-    title: "Bilateral Silicon Chip Agreement Drafted",
-    description:
-      "Foreign trade delegates in New Delhi have signed a memorandum of cooperation, aligning supply-chain safety targets and technology joint-ventures.",
-    source: "Diplomatic Affairs",
-    category: "politics",
-    publishedAt: ago(5.0), // 5h ago
-    locationName: "New Delhi, Delhi",
-    lat: 28.6144,
-    lng: 77.201,
+      "Fast-moving brush fires have breached isolation zones, taking three regional distribution lines offline. Utility grids are routing emergency reserves.",
+    source: "CalFire Broadcast",
+    category: "disaster",
+    publishedAt: ago(3.5), // 3.5h ago
+    locationName: "Sacramento, California",
+    lat: 38.5816,
+    lng: -121.4944,
     intensity: 0.75,
   },
   {
-    id: "ev-pol-2",
-    title: "State Assembly Approves Municipal Tax Restructuring Bill",
+    id: "ev-dis-3",
+    title: "Flash Flood Alert Level Raised to Red as Levee Overflows",
     description:
-      "The Maharashtra assembly has passed a resolution transferring property assessment updates to an automated digital satellite appraisal model.",
-    source: "Legislative Gazette",
-    category: "politics",
-    publishedAt: ago(20.5), // 20.5h ago
-    locationName: "Mumbai, Maharashtra",
-    lat: 19.01,
-    lng: 72.85,
-    intensity: 0.62,
-  },
-  {
-    id: "ev-pol-3",
-    title: "National Cyber Agency Drafts Cross-Border Privacy Guidelines",
-    description:
-      "A draft ordinance released today restricts local caching of financial profiles by foreign service providers unless hosted on certified sovereign servers.",
-    source: "Federal Gazette",
-    category: "politics",
-    publishedAt: ago(55.0), // 2.3d ago
-    locationName: "New Delhi, Delhi",
-    lat: 28.622,
-    lng: 77.234,
-    intensity: 0.8,
-  },
-  {
-    id: "ev-pol-4",
-    title: "High-level Trade Summit Organized in Hyderabad",
-    description:
-      "Representatives from Singapore, UAE, and Germany meet to establish a joint technology corridor and special economic zone for aerospace engineering.",
-    source: "Hyderabad Business Record",
-    category: "politics",
-    publishedAt: ago(140.0), // 5.8d ago
-    locationName: "Hyderabad, Telangana",
-    lat: 17.385,
-    lng: 78.4867,
-    intensity: 0.71,
+      "River levels peaked 2 meters above standard banks. Emergency response agencies are organizing evacuations in low-lying suburban wards.",
+    source: "National Weather",
+    category: "disaster",
+    publishedAt: ago(22.0), // 22h ago
+    locationName: "London District, UK",
+    lat: 51.5074,
+    lng: -0.1278,
+    intensity: 0.68,
   },
 
-  // ── ECONOMY (Emerald Mint) ──
+  // ── HEALTH / BIOLOGICAL (Purple / Pink) ──
   {
-    id: "ev-econ-1",
-    title: "Sovereign Bond Auction Reports Unprecedented Institutional Inflow",
+    id: "ev-med-1",
+    title: "Ebola Outbreak Confirmed in Eastern Forestry Zone",
     description:
-      "Yields on Indian 10-year benchmark bonds drop to a three-month low of 6.84% following strong purchase orders from global pension funds.",
-    source: "Markets Intelligence",
-    category: "economy",
-    publishedAt: ago(5.5), // 5.5h ago
-    locationName: "Mumbai, Maharashtra",
-    lat: 19.03,
-    lng: 72.86,
-    intensity: 0.82,
+      "The regional health ministry has validated three active cases of Ebola Sudan strain. Contact tracers are establishing containment perimeters.",
+    source: "World Health Org",
+    category: "health",
+    publishedAt: ago(2.5), // 2.5h ago
+    locationName: "Bundibugyo, Uganda",
+    lat: 0.706,
+    lng: 30.063,
+    intensity: 0.85,
   },
   {
-    id: "ev-econ-2",
-    title: "Semiconductor Assembly Plant Secures Sovereign Subsidy",
+    id: "ev-med-2",
+    title: "Cruise Liner Quarantined Following Viral Outbreak",
     description:
-      "A consortium has received final clearance for a $1.2B assembly plant under the domestic manufacturing initiative. Breaking ground scheduled next month.",
-    source: "Industrial Bulletin",
-    category: "economy",
-    publishedAt: ago(23.0), // 23h ago
-    locationName: "Ahmedabad, Gujarat",
-    lat: 23.0225,
-    lng: 72.5714,
+      "Forty passengers aboard the cruise vessel have presented severe respiratory symptoms. Local health officers are boarding to screen for Hantavirus.",
+    source: "Port Authority",
+    category: "health",
+    publishedAt: ago(11.0), // 11h ago
+    locationName: "Miami Harbor, Florida",
+    lat: 25.7617,
+    lng: -80.1918,
     intensity: 0.78,
   },
   {
-    id: "ev-econ-3",
-    title: "Retail Inflation Index Ticks Up on Transport Costs",
+    id: "ev-med-3",
+    title: "Avian Influenza Detected in Local Commercial Poultry Farms",
     description:
-      "The core consumer price index has increased slightly to 4.3% due to fuel price updates and logistics constraints along western freight tracks.",
-    source: "Apex Business News",
-    category: "economy",
-    publishedAt: ago(74.0), // 3.1d ago
-    locationName: "Pune, Maharashtra",
-    lat: 18.5204,
-    lng: 73.8567,
-    intensity: 0.67,
-  },
-  {
-    id: "ev-econ-4",
-    title: "Fintech Conglomerate Establishes Regional Center in GIFT City",
-    description:
-      "A major payment gateway provider has acquired a commercial tower block inside the financial tech zone to establish its international operations hub.",
-    source: "Gujarat Monitor",
-    category: "economy",
-    publishedAt: ago(160.0), // 6.6d ago
-    locationName: "Gandhinagar, Gujarat",
-    lat: 23.2156,
-    lng: 72.6369,
-    intensity: 0.72,
+      "A highly pathogenic strain has been identified, triggering a quarantine area of 10km. Health agents are testing immediate farm workers.",
+    source: "AgriHealth Alert",
+    category: "health",
+    publishedAt: ago(36.0), // 1.5d ago
+    locationName: "Tokyo Wards, Japan",
+    lat: 35.6762,
+    lng: 139.6503,
+    intensity: 0.7,
   },
 
-  // ── TECH / CYBER (Neon Cyan) ──
+  // ── SPACE / SATELLITE (Cyan / Blue) ──
   {
-    id: "ev-tech-1",
-    title: "Local Quantum Cryptography Testbed Declared Operational",
+    id: "ev-spa-1",
+    title: "X-Class Solar Flare Hits Earth Magnetosphere",
     description:
-      "Engineers have completed a fiber-optic quantum key distribution link spanning 120km, demonstrating tamper-proof routing for governmental secure systems.",
-    source: "Indian Science Wire",
-    category: "tech",
-    publishedAt: ago(1.8), // 1.8h ago
-    locationName: "Bengaluru, Karnataka",
-    lat: 12.975,
-    lng: 77.58,
-    intensity: 0.81,
+      "An X3.4 flare erupted from Sunspot AR3211, triggering high-frequency radio blackouts over the western hemisphere and vibrant polar auroras.",
+    source: "Space Weather Desk",
+    category: "space",
+    publishedAt: ago(4.2), // 4.2h ago
+    locationName: "Cape Canaveral, Florida",
+    lat: 28.5721,
+    lng: -80.648,
+    intensity: 0.92,
   },
   {
-    id: "ev-tech-2",
-    title: "AI Co-processor Startup Gathers $150M Venture Allocation",
+    id: "ev-spa-2",
+    title: "Debris Cloud Tracked Following Satellite Collision",
     description:
-      "An chip-design startup in Gurugram has completed a Series C funding round to scale development of specialized inference processors tailored for automated vision models.",
-    source: "Venture Report India",
-    category: "tech",
-    publishedAt: ago(7.2), // 7.2h ago
-    locationName: "Gurugram, Haryana",
-    lat: 28.4595,
-    lng: 77.0266,
+      "Commercial radars mapped 15 new debris pieces in low Earth orbit. Satellites in nearby orbital pathways are coordinating evasive maneuvers.",
+    source: "Space Force Command",
+    category: "space",
+    publishedAt: ago(25.0), // 25h ago
+    locationName: "Low Earth Orbit",
+    lat: 40.7128,
+    lng: -74.006,
+    intensity: 0.8,
+  },
+
+  // ── NEWS / GEOPOLITICAL (Grey / Blue) ──
+  {
+    id: "ev-new-1",
+    title: "Sovereign Funding Reallocated to Cyber Security Infrastructure",
+    description:
+      "Federal budget divisions reallocated $4.2B to strengthen public cloud servers and municipal grid defense centers against external state groups.",
+    source: "Federal Register",
+    category: "news",
+    publishedAt: ago(1.8), // 1.8h ago
+    locationName: "Washington D.C., USA",
+    lat: 38.9072,
+    lng: -77.0369,
     intensity: 0.74,
   },
   {
-    id: "ev-tech-3",
-    title: "Smart Grid Command System Launches Trial Phase",
+    id: "ev-new-2",
+    title: "Diplomatic Envoys Convene for Middle East Maritime Security",
     description:
-      "The local electrical utility has deployed a machine-learning control system to forecast load surges and automate substation switches in real time.",
-    source: "Grid Operator Journal",
-    category: "tech",
-    publishedAt: ago(25.5), // 25.5h (1.1d) ago
-    locationName: "Hyderabad, Telangana",
-    lat: 17.41,
-    lng: 78.51,
-    intensity: 0.68,
+      "Delegates from eight states met in Qatar to draft shipping lane defense agreements. The draft focuses on cargo route protection.",
+    source: "Diplomacy Today",
+    category: "news",
+    publishedAt: ago(8.5), // 8.5h ago
+    locationName: "Doha, Qatar",
+    lat: 25.2854,
+    lng: 51.531,
+    intensity: 0.69,
   },
   {
-    id: "ev-tech-4",
-    title: "Maritime Autonomous Shipping Trial Completed Successfully",
+    id: "ev-new-3",
+    title: "Semiconductor Trade Measures Enacted",
     description:
-      "An autonomous cargo barge navigated the shipping canal under dense fog conditions using lidar systems and local radar arrays.",
-    source: "Coastline Tech",
-    category: "tech",
-    publishedAt: ago(92.0), // 3.8d ago
-    locationName: "Kochi, Kerala",
-    lat: 9.9312,
-    lng: 76.2673,
-    intensity: 0.63,
+      "Bilateral export limits on raw wafers and logic gates took effect, impacting electronic supplies across East Asian assembly corridors.",
+    source: "Nikkei News",
+    category: "news",
+    publishedAt: ago(30.0), // 30h ago
+    locationName: "Taipei, Taiwan",
+    lat: 25.033,
+    lng: 121.5654,
+    intensity: 0.76,
+  },
+  {
+    id: "ev-new-4",
+    title: "Global Supply Chain Congestion Reports Rise",
+    description:
+      "Average container wait times have increased to 7.4 days due to localized strikes and canal reroutings near international trade bottlenecks.",
+    source: "Bloomberg Trade",
+    category: "news",
+    publishedAt: ago(96.0), // 4d ago
+    locationName: "Singapore Harbor",
+    lat: 1.3521,
+    lng: 103.8198,
+    intensity: 0.62,
   },
 ];

@@ -1,10 +1,9 @@
 export type NewsCategory =
-  | "breaking"
-  | "protests"
-  | "disasters"
-  | "politics"
-  | "economy"
-  | "tech";
+  | "news"
+  | "conflict"
+  | "disaster"
+  | "health"
+  | "space";
 
 export type TimeRange = "1h" | "6h" | "24h" | "7d" | "all";
 
@@ -19,4 +18,5 @@ export interface NewsEvent {
   lat: number;
   lng: number;
   intensity: number;
+  url?: string;
 }

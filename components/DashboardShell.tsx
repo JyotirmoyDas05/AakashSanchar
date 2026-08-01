@@ -1,210 +1,307 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
-import type { TimeRange } from "@/types/news";
+import { type ReactNode, useEffect, useState } from "react";
 
 interface DashboardShellProps {
-  logo?: ReactNode;
-  timeRange: TimeRange;
-  onTimeRangeChange: (range: TimeRange) => void;
+  activeTab: "map" | "wire";
+  onTabChange: (tab: "map" | "wire") => void;
   leftRail: ReactNode;
-  statsBar: ReactNode;
-  map: ReactNode;
-  insightsPanel: ReactNode;
-  detailsPanel?: ReactNode;
+  tickerBar: ReactNode;
+  contentWorkspace: ReactNode;
+  floatingWindows: ReactNode;
+  locateWidget?: ReactNode;
+  filterWidget?: ReactNode;
+  settingsWidget?: ReactNode;
+  onToggleLocate: () => void;
+  onToggleFilter: () => void;
+  onToggleSettings?: () => void;
+  isLocateOpen: boolean;
+  isFilterOpen: boolean;
+  isSettingsOpen?: boolean;
   commandPalette?: ReactNode;
+  layoutMode?: "sidebar" | "floating";
+  theme?: "dark" | "light";
+  timezone?: string;
+  dateFormat?: string;
 }
 
-const TIME_RANGES: { value: TimeRange; label: string }[] = [
-  { value: "1h", label: "1H" },
-  { value: "6h", label: "6H" },
-  { value: "24h", label: "24H" },
-  { value: "7d", label: "7D" },
-  { value: "all", label: "ALL" },
-];
-
 export default function DashboardShell({
-  logo,
-  timeRange,
-  onTimeRangeChange,
+  activeTab,
+  onTabChange,
   leftRail,
-  statsBar,
-  map,
-  insightsPanel,
-  detailsPanel,
+  tickerBar,
+  contentWorkspace,
+  floatingWindows,
+  locateWidget,
+  filterWidget,
+  settingsWidget,
+  onToggleLocate,
+  onToggleFilter,
+  onToggleSettings,
+  isLocateOpen,
+  isFilterOpen,
+  isSettingsOpen = false,
   commandPalette,
+  layoutMode = "sidebar",
+  theme = "dark",
+  timezone = "UTC",
+  dateFormat = "ISO",
 }: DashboardShellProps) {
-  const [mobileMenu, setMobileMenu] = useState<"none" | "layers" | "insights">(
-    "none",
-  );
+  const isLight = theme === "light";
+  const [systemTime, setSystemTime] = useState("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const tzTarget =
+        timezone === "EST"
+          ? "America/New_York"
+          : timezone === "PST"
+            ? "America/Los_Angeles"
+            : timezone === "CET"
+              ? "Europe/Berlin"
+              : timezone === "JST"
+                ? "Asia/Tokyo"
+                : timezone === "LOCAL"
+                  ? undefined
+                  : "UTC";
+
+      let dateStr = "";
+      if (dateFormat === "EU") {
+        dateStr = now.toLocaleDateString("en-GB", {
+          timeZone: tzTarget,
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+      } else if (dateFormat === "US") {
+        dateStr = now.toLocaleDateString("en-US", {
+          timeZone: tzTarget,
+          month: "short",
+          day: "2-digit",
+          year: "numeric",
+        });
+      } else {
+        // ISO
+        const parts = new Intl.DateTimeFormat("en-CA", {
+          timeZone: tzTarget,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(now);
+        dateStr = parts;
+      }
+
+      const timeStr = now.toLocaleTimeString("en-US", {
+        timeZone: tzTarget,
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      const tzLabel = timezone === "LOCAL" ? "LOCAL" : timezone;
+      setSystemTime(`${dateStr} // ${timeStr} ${tzLabel}`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, [timezone, dateFormat]);
 
   return (
-    <div className="flex h-dvh w-full flex-col bg-brand-bg text-slate-100 overflow-hidden font-sans select-none antialiased">
-      {/* 1. Sticky Top Navigation Bar */}
-      <header className="h-14 border-b border-brand-border bg-[#070b13] flex items-center justify-between px-4 shrink-0 z-40">
-        <div className="flex items-center gap-3">
-          {logo || (
-            <div className="flex items-center gap-2">
-              {/* Futuristic vector logo icon */}
-              <svg
-                className="h-5 w-5 text-cyan-500 animate-pulse"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-              <h1 className="font-mono text-sm font-black tracking-wider text-white">
-                AEGIS<span className="text-cyan-500 font-normal">SENTINEL</span>
-              </h1>
-            </div>
-          )}
-          <span className="hidden sm:inline rounded-full bg-slate-900 border border-brand-border px-2 py-0.5 text-[9px] font-mono text-slate-500 tracking-wider">
-            SOVEREIGN OSINT GRID v1.0
-          </span>
-        </div>
+    <div
+      className={`flex h-dvh w-full flex-col overflow-hidden font-sans select-none antialiased border ${
+        isLight
+          ? "bg-slate-50 text-slate-900 border-slate-200"
+          : "bg-brand-bg text-slate-200 border-brand-border"
+      }`}
+    >
+      {/* 1. Header Navigation Bar */}
+      <header
+        className={`h-12 border-b flex items-center justify-between px-4 shrink-0 z-40 font-mono ${
+          isLight
+            ? "bg-white border-slate-200 text-slate-900 shadow-sm"
+            : "bg-[#0a0a0a] border-brand-border text-slate-200"
+        }`}
+      >
+        <div className="flex items-center gap-6">
+          {/* Logo */}
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_#06b6d4]" />
+            <h1
+              className={`text-xs font-black tracking-widest uppercase ${
+                isLight ? "text-slate-900" : "text-white"
+              }`}
+            >
+              WORLD<span className="text-cyan-500 font-normal">MONITOR</span>
+            </h1>
+          </div>
 
-        {/* Time Filter Segment Controls */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 rounded border border-brand-border bg-[#0d1423] p-0.5">
-            {TIME_RANGES.map((t) => (
+          {/* Navigation Tabs */}
+          <div className="flex items-center gap-1">
+            {(["map", "wire"] as const).map((tab) => (
               <button
-                key={t.value}
+                key={tab}
                 type="button"
-                onClick={() => onTimeRangeChange(t.value)}
-                className={`rounded px-2.5 py-1 font-mono text-[10px] font-bold uppercase transition-all duration-150 ${
-                  timeRange === t.value
-                    ? "bg-brand-border text-cyan-400 border border-[#2b3e63]/60 shadow"
-                    : "text-slate-500 hover:text-slate-300 border border-transparent"
+                onClick={() => onTabChange(tab)}
+                className={`px-3.5 py-1 text-[10px] font-bold tracking-widest uppercase transition-all border ${
+                  activeTab === tab
+                    ? isLight
+                      ? "bg-cyan-50 border-cyan-300 text-cyan-800 font-bold shadow-sm"
+                      : "bg-[#18181b] border-[#333] text-cyan-400"
+                    : isLight
+                      ? "border-transparent text-slate-600 hover:text-slate-900"
+                      : "border-transparent text-slate-500 hover:text-slate-350"
                 }`}
               >
-                {t.label}
+                THE {tab}
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Mobile toggle controls */}
-          <div className="flex md:hidden gap-1">
-            <button
-              type="button"
-              onClick={() =>
-                setMobileMenu(mobileMenu === "layers" ? "none" : "layers")
-              }
-              className={`rounded border p-1.5 ${
-                mobileMenu === "layers"
-                  ? "border-cyan-500 bg-[#0f192b]"
-                  : "border-brand-border"
-              }`}
-              aria-label="Toggle Layers"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
-                />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setMobileMenu(mobileMenu === "insights" ? "none" : "insights")
-              }
-              className={`rounded border p-1.5 ${
-                mobileMenu === "insights"
-                  ? "border-cyan-500 bg-[#0f192b]"
-                  : "border-brand-border"
-              }`}
-              aria-label="Toggle Insights"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-            </button>
-          </div>
+        {/* System Time & Live scanner metrics */}
+        <div
+          className={`hidden md:flex items-center gap-4 text-[9px] font-bold ${
+            isLight ? "text-slate-700" : "text-slate-500"
+          }`}
+        >
+          <span className="tabular-nums">{systemTime}</span>
         </div>
       </header>
 
-      {/* 2. Main content container */}
+      {/* 2. Main app workspace */}
       <div className="flex flex-1 w-full overflow-hidden relative">
-        {/* Left control rail (Desktop-first) */}
-        <aside className={`hidden md:block shrink-0 h-full`}>{leftRail}</aside>
+        {/* Left rail menu */}
+        <aside
+          className={`h-full z-1050 transition-all duration-300 ease-in-out ${
+            layoutMode === "sidebar"
+              ? "w-14 shrink-0"
+              : "w-0 overflow-visible relative"
+          }`}
+        >
+          {leftRail}
+        </aside>
 
-        {/* Mobile Layers Drawer Overlay */}
-        {mobileMenu === "layers" && (
-          <div
-            className="absolute inset-0 z-30 bg-black/60 md:hidden backdrop-blur-xs"
-            onClick={() => setMobileMenu("none")}
-          >
-            <aside
-              className="w-[240px] h-full bg-[#070b13] animate-in slide-in-from-left duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {leftRail}
-            </aside>
-          </div>
-        )}
+        {/* Central main workspace area */}
+        <main className="flex-1 flex flex-col min-w-0 h-full relative z-0">
+          <div className="flex-1 overflow-hidden relative">
+            {contentWorkspace}
 
-        {/* Central Map Canvas + Telemetry overlays */}
-        <main className="flex-1 flex flex-col min-w-0 h-full relative">
-          {/* Top telemetry bar */}
-          <div className="p-3 shrink-0 z-10 bg-gradient-to-b from-[#060913] to-transparent">
-            {statsBar}
-          </div>
+            {/* Bottom Right Map Actions Overlay (Locate / Filter / Settings widgets) */}
+            {activeTab === "map" && (
+              <div className="absolute bottom-4 right-4 z-1050 flex items-center gap-1.5 font-mono text-[9px] font-bold">
+                <button
+                  type="button"
+                  onClick={onToggleLocate}
+                  className={`rounded border px-2.5 py-1.5 transition-all flex items-center gap-1.5 ${
+                    isLocateOpen
+                      ? isLight
+                        ? "border-cyan-600 bg-cyan-100/90 text-cyan-900 shadow-md font-bold"
+                        : "border-cyan-500 bg-[#0d1e2e]/85 text-white shadow-[0_0_10px_rgba(6,182,212,0.3)]"
+                      : isLight
+                        ? "border-slate-300 bg-white/90 text-slate-700 hover:bg-slate-100 hover:text-slate-900 shadow-sm"
+                        : "border-[#222] bg-brand-bg/85 text-slate-400 hover:bg-[#121214] hover:text-slate-200"
+                  }`}
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  LOCATE
+                </button>
 
-          {/* Central Map Layer */}
-          <div className="flex-1 overflow-hidden relative z-0 border-t border-b border-brand-border">
-            {map}
+                <button
+                  type="button"
+                  onClick={onToggleFilter}
+                  className={`rounded border px-2.5 py-1.5 transition-all flex items-center gap-1.5 ${
+                    isFilterOpen
+                      ? isLight
+                        ? "border-cyan-600 bg-cyan-100/90 text-cyan-900 shadow-md font-bold"
+                        : "border-cyan-500 bg-[#0d1e2e]/85 text-white shadow-[0_0_10px_rgba(6,182,212,0.3)]"
+                      : isLight
+                        ? "border-slate-300 bg-white/90 text-slate-700 hover:bg-slate-100 hover:text-slate-900 shadow-sm"
+                        : "border-[#222] bg-brand-bg/85 text-slate-400 hover:bg-[#121214] hover:text-slate-200"
+                  }`}
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.707 7.293A1 1 0 013 6.586V4z"
+                    />
+                  </svg>
+                  FILTER
+                </button>
+
+                {onToggleSettings && (
+                  <button
+                    type="button"
+                    onClick={onToggleSettings}
+                    className={`rounded border px-2.5 py-1.5 transition-all flex items-center gap-1.5 ${
+                      isSettingsOpen
+                        ? isLight
+                          ? "border-cyan-600 bg-cyan-100/90 text-cyan-900 shadow-md font-bold"
+                          : "border-cyan-500 bg-[#0d1e2e]/85 text-white shadow-[0_0_10px_rgba(6,182,212,0.3)]"
+                        : isLight
+                          ? "border-slate-300 bg-white/90 text-slate-700 hover:bg-slate-100 hover:text-slate-900 shadow-sm"
+                          : "border-[#222] bg-brand-bg/85 text-slate-400 hover:bg-[#121214] hover:text-slate-200"
+                    }`}
+                  >
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                    SETTINGS
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Action Widgets Modals overlay */}
+            {locateWidget}
+            {filterWidget}
+            {settingsWidget}
           </div>
         </main>
 
-        {/* Right analytics panel (Desktop-first) */}
-        <aside className="hidden lg:block shrink-0 h-full">
-          {insightsPanel}
-        </aside>
-
-        {/* Mobile Insights Drawer Overlay */}
-        {mobileMenu === "insights" && (
-          <div
-            className="absolute inset-0 z-30 bg-black/60 lg:hidden backdrop-blur-xs"
-            onClick={() => setMobileMenu("none")}
-          >
-            <aside
-              className="absolute right-0 w-[300px] h-full bg-[#070b13] animate-in slide-in-from-right duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {insightsPanel}
-            </aside>
-          </div>
-        )}
-
-        {/* Dynamic details overlay drawer (Right docking overlay) */}
-        {detailsPanel && (
-          <div className="absolute top-0 right-0 z-20 h-full w-80 shadow-2xl border-l border-brand-border animate-in slide-in-from-right duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
-            {detailsPanel}
-          </div>
-        )}
+        {/* Floating panel overlay instances */}
+        {floatingWindows}
       </div>
 
-      {/* Floating Keyboard search palette */}
+      {/* 3. Bottom scrolling news ticker */}
+      {tickerBar}
+
+      {/* Global command palette search overlay */}
       {commandPalette}
     </div>
   );

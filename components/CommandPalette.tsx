@@ -9,6 +9,7 @@ interface CommandPaletteProps {
   onClose: () => void;
   events: NewsEvent[];
   onEventSelect: (eventId: string, coords: [number, number]) => void;
+  theme?: "dark" | "light";
 }
 
 export default function CommandPalette({
@@ -16,13 +17,14 @@ export default function CommandPalette({
   onClose,
   events,
   onEventSelect,
+  theme = "dark",
 }: CommandPaletteProps) {
+  const isLight = theme === "light";
   const [search, setSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Reset states on toggle
   useEffect(() => {
     if (isOpen) {
       setSearch("");
@@ -39,7 +41,6 @@ export default function CommandPalette({
       e.source.toLowerCase().includes(search.toLowerCase()),
   );
 
-  // Manage list scrolling to keep selected item in view
   useEffect(() => {
     if (scrollContainerRef.current) {
       const selectedEl = scrollContainerRef.current.children[
@@ -61,7 +62,6 @@ export default function CommandPalette({
     }
   }, [selectedIndex]);
 
-  // Handle keyboard navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (!isOpen) return;
@@ -96,17 +96,27 @@ export default function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-9999 flex items-start justify-center bg-black/60 pt-[10dvh] backdrop-blur-sm"
+      className="fixed inset-0 z-9999 flex items-start justify-center bg-black/50 pt-[10dvh] backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl overflow-hidden rounded-xl border border-brand-border bg-[#0b101c]/95 shadow-2xl backdrop-blur-xl animate-in fade-in duration-200 slide-in-from-top-4"
+        className={`w-full max-w-xl overflow-hidden rounded-xl border shadow-2xl backdrop-blur-xl animate-in fade-in duration-200 slide-in-from-top-4 ${
+          isLight
+            ? "border-slate-300 bg-white text-slate-900"
+            : "border-brand-border bg-[#0b101c]/95 text-slate-100"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Input */}
-        <div className="flex items-center border-b border-brand-border px-4 py-3">
+        <div
+          className={`flex items-center border-b px-4 py-3 ${
+            isLight ? "border-slate-200" : "border-brand-border"
+          }`}
+        >
           <svg
-            className="h-5 w-5 text-slate-400 mr-3"
+            className={`h-5 w-5 mr-3 ${
+              isLight ? "text-slate-500" : "text-slate-400"
+            }`}
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
             fill="none"
@@ -121,7 +131,11 @@ export default function CommandPalette({
           <input
             ref={inputRef}
             type="text"
-            className="flex-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 outline-none"
+            className={`flex-1 bg-transparent text-sm outline-none ${
+              isLight
+                ? "text-slate-900 placeholder-slate-500"
+                : "text-slate-100 placeholder-slate-500"
+            }`}
             placeholder="Search events, locations, summaries... (Esc to close)"
             value={search}
             onChange={(e) => {
@@ -129,7 +143,13 @@ export default function CommandPalette({
               setSelectedIndex(0);
             }}
           />
-          <div className="rounded bg-brand-border px-1.5 py-0.5 text-[10px] font-mono text-slate-400 border border-slate-700">
+          <div
+            className={`rounded px-1.5 py-0.5 text-[10px] font-mono border ${
+              isLight
+                ? "bg-slate-100 text-slate-700 border-slate-300"
+                : "bg-brand-border text-slate-400 border-slate-700"
+            }`}
+          >
             ESC
           </div>
         </div>
@@ -140,7 +160,11 @@ export default function CommandPalette({
           className="max-h-87.5 overflow-y-auto p-2"
         >
           {filteredEvents.length === 0 ? (
-            <div className="py-8 text-center text-sm text-slate-500 font-mono">
+            <div
+              className={`py-8 text-center text-sm font-mono ${
+                isLight ? "text-slate-500" : "text-slate-500"
+              }`}
+            >
               NO MATCHING CORRELATIONS DETECTED
             </div>
           ) : (
@@ -149,48 +173,68 @@ export default function CommandPalette({
               const catLabel = labelForCategory(ev.category);
 
               let catGlowColor = "bg-slate-500";
-              if (ev.category === "breaking") catGlowColor = "bg-cat-breaking";
-              else if (ev.category === "protests")
-                catGlowColor = "bg-cat-protests";
-              else if (ev.category === "disasters")
-                catGlowColor = "bg-cat-disasters";
-              else if (ev.category === "politics")
-                catGlowColor = "bg-cat-politics";
-              else if (ev.category === "economy")
-                catGlowColor = "bg-cat-economy";
-              else if (ev.category === "tech") catGlowColor = "bg-cat-tech";
+              if (ev.category === "news") catGlowColor = "bg-cat-news";
+              else if (ev.category === "conflict")
+                catGlowColor = "bg-cat-conflict";
+              else if (ev.category === "disaster")
+                catGlowColor = "bg-cat-disaster";
+              else if (ev.category === "health") catGlowColor = "bg-cat-health";
+              else if (ev.category === "space") catGlowColor = "bg-cat-space";
 
               return (
                 <div
                   key={ev.id}
                   className={`flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-colors ${
                     isSelected
-                      ? "bg-brand-border text-white border border-brand-border-glow/50"
-                      : "text-slate-300 hover:bg-brand-border/40 border border-transparent"
+                      ? isLight
+                        ? "bg-cyan-100 text-cyan-950 border border-cyan-400 font-bold shadow-sm"
+                        : "bg-brand-border text-white border border-brand-border-glow/50"
+                      : isLight
+                        ? "text-slate-800 hover:bg-slate-100 border border-transparent"
+                        : "text-slate-300 hover:bg-brand-border/40 border border-transparent"
                   }`}
                   onClick={() => {
                     onEventSelect(ev.id, [ev.lat, ev.lng]);
                     onClose();
                   }}
                 >
-                  {/* Category dot with shadow */}
                   <div
                     className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${catGlowColor}`}
                   />
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      <span
+                        className={`truncate text-xs font-semibold uppercase tracking-wider ${
+                          isLight
+                            ? "text-slate-600 font-bold"
+                            : "text-slate-400"
+                        }`}
+                      >
                         {catLabel} • {ev.source}
                       </span>
-                      <span className="shrink-0 font-mono text-[10px] text-slate-500">
+                      <span
+                        className={`shrink-0 font-mono text-[10px] ${
+                          isLight
+                            ? "text-slate-600 font-bold"
+                            : "text-slate-500"
+                        }`}
+                      >
                         {ev.lat.toFixed(3)}, {ev.lng.toFixed(3)}
                       </span>
                     </div>
-                    <h4 className="mt-0.5 text-sm font-semibold truncate text-slate-100">
+                    <h4
+                      className={`mt-0.5 text-sm font-semibold truncate ${
+                        isLight ? "text-slate-900" : "text-slate-100"
+                      }`}
+                    >
                       {ev.title}
                     </h4>
-                    <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">
+                    <p
+                      className={`mt-0.5 text-xs line-clamp-1 ${
+                        isLight ? "text-slate-600" : "text-slate-400"
+                      }`}
+                    >
                       {ev.description}
                     </p>
                   </div>
@@ -201,7 +245,13 @@ export default function CommandPalette({
         </div>
 
         {/* Footer info */}
-        <div className="flex items-center justify-between border-t border-brand-border bg-[#080d17] px-4 py-2 text-[10px] font-mono text-slate-500">
+        <div
+          className={`flex items-center justify-between border-t px-4 py-2 text-[10px] font-mono ${
+            isLight
+              ? "bg-slate-100 border-slate-200 text-slate-700 font-bold"
+              : "bg-[#080d17] border-brand-border text-slate-500"
+          }`}
+        >
           <span>SEARCHING {events.length} LOGS</span>
           <div className="flex gap-2">
             <span>↑↓ to navigate</span>
