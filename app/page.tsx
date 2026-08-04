@@ -299,6 +299,7 @@ export default function Home() {
           onToggleWidget={handleToggleWidget}
           layoutMode={settings.layoutMode}
           theme={settings.theme}
+          activeTab={activeTab}
         />
       }
       tickerBar={

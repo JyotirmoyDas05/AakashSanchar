@@ -7,6 +7,7 @@ interface LeftControlRailProps {
   onToggleWidget: (widget: string) => void;
   layoutMode?: "sidebar" | "floating";
   theme?: "dark" | "light";
+  activeTab?: "map" | "wire";
 }
 
 interface WidgetItem {
@@ -21,6 +22,7 @@ export default function LeftControlRail({
   onToggleWidget,
   layoutMode = "sidebar",
   theme = "dark",
+  activeTab = "map",
 }: LeftControlRailProps) {
   const isLight = theme === "light";
 
@@ -152,8 +154,9 @@ export default function LeftControlRail({
     },
   ];
 
-  // 1. Floating Rail Mode (World Monitor style)
+  // 1. Floating Rail Mode (World Monitor style) - Do not render on "The Wire" page
   if (layoutMode === "floating") {
+    if (activeTab === "wire") return null;
     return (
       <div
         className={`absolute left-4 bottom-4 z-1050 flex flex-col gap-1 p-1.5 rounded-lg border backdrop-blur-md w-37.5 font-mono select-none transition-all duration-200 ${
