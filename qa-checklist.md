@@ -1,9 +1,9 @@
-# Aegis Sentinel QA Checklist
+# AakashSanchar QA Checklist
 
-Use this checklist to verify the interactive features, design specs, and performance targets of the Aegis Sentinel application.
+Use this checklist to verify the interactive features, design specs, and performance targets of the AakashSanchar application.
 
 ## 1. App Shell & Layout
-- [ ] Sticky top navigation bar renders the Aegis Sentinel brand name and sovereign status badge.
+- [ ] Sticky top navigation bar renders the AakashSanchar brand name and sovereign status badge.
 - [ ] Left control rail fits perfectly inside the viewport grid and remains fixed.
 - [ ] Right insights panel displays dynamic statistics (distribution progress bars, top hotspots, recent logs).
 - [ ] Details panel opens as a smooth slide-in overlay from the right, docking correctly without clipping the map canvas.

@@ -1,6 +1,6 @@
-# Aegis Sentinel Implementation Plan
+# AakashSanchar Implementation Plan
 
-This document outlines the step-by-step implementation plan for Aegis Sentinel, following modular and typed Next.js standards.
+This document outlines the step-by-step implementation plan for AakashSanchar, following modular and typed Next.js standards.
 
 ## Phase 1: Core Type Definitions & Data Pipeline
 1.  **Refactor `types/news.ts`**:

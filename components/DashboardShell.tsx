@@ -18,12 +18,15 @@ interface DashboardShellProps {
   isLocateOpen: boolean;
   isFilterOpen: boolean;
   isSettingsOpen?: boolean;
+  onToggleSearch?: () => void;
   commandPalette?: ReactNode;
   layoutMode?: "sidebar" | "floating";
   theme?: "dark" | "light";
   timezone?: string;
   dateFormat?: string;
 }
+
+import AiHeaderStatus from "@/components/AiHeaderStatus";
 
 export default function DashboardShell({
   activeTab,
@@ -38,6 +41,7 @@ export default function DashboardShell({
   onToggleLocate,
   onToggleFilter,
   onToggleSettings,
+  onToggleSearch,
   isLocateOpen,
   isFilterOpen,
   isSettingsOpen = false,
@@ -118,13 +122,14 @@ export default function DashboardShell({
     >
       {/* 1. Header Navigation Bar */}
       <header
-        className={`h-12 border-b flex items-center justify-between px-4 shrink-0 z-40 font-mono ${
+        className={`h-12 border-b flex items-center justify-between px-4 shrink-0 z-40 font-mono relative ${
           isLight
             ? "bg-white border-slate-200 text-slate-900 shadow-sm"
             : "bg-[#0a0a0a] border-brand-border text-slate-200"
         }`}
       >
-        <div className="flex items-center gap-6">
+        {/* Left: Logo + Tabs — natural width */}
+        <div className="flex items-center gap-6 shrink-0">
           {/* Logo */}
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_#06b6d4]" />
@@ -133,7 +138,7 @@ export default function DashboardShell({
                 isLight ? "text-slate-900" : "text-white"
               }`}
             >
-              WORLD<span className="text-cyan-500 font-normal">MONITOR</span>
+              AAKASH<span className="text-cyan-500 font-normal">SANCHAR</span>
             </h1>
           </div>
 
@@ -160,12 +165,56 @@ export default function DashboardShell({
           </div>
         </div>
 
-        {/* System Time & Live scanner metrics */}
+        {/* Middle: Command Palette — absolutely centered so it never shifts */}
+        {onToggleSearch && (
+          <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex">
+            <button
+              type="button"
+              onClick={onToggleSearch}
+              className={`flex items-center gap-2.5 px-3 py-1 rounded-md text-xs font-mono transition-all border shadow-sm ${
+                isLight
+                  ? "bg-slate-100/90 border-slate-300 text-slate-600 hover:bg-slate-200 hover:text-slate-900 hover:border-slate-400"
+                  : "bg-[#141416]/90 border-[#2b2b30] text-slate-400 hover:bg-[#1c1c20] hover:text-slate-200 hover:border-cyan-500/50"
+              }`}
+              title="Search Intelligence (Press / or Ctrl+K)"
+            >
+              <svg
+                className="h-3.5 w-3.5 text-slate-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth="2"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="m21 21-4.3-4.3"
+                />
+              </svg>
+              <span className="text-[11px] font-medium tracking-wide">
+                Search intelligence, regions, threats...
+              </span>
+              <kbd
+                className={`ml-2 px-1.5 py-0.5 text-[9px] font-mono font-bold rounded border ${
+                  isLight
+                    ? "bg-white border-slate-300 text-slate-600"
+                    : "bg-black/40 border-[#38383e] text-slate-400"
+                }`}
+              >
+                /
+              </kbd>
+            </button>
+          </div>
+        )}
+
+        {/* Right: System Time & AI status — fixed min-width so text changes never shift layout */}
         <div
-          className={`hidden md:flex items-center gap-4 text-[9px] font-bold ${
+          className={`hidden md:flex items-center gap-3 text-[9px] font-bold shrink-0 min-w-55 justify-end ${
             isLight ? "text-slate-700" : "text-slate-500"
           }`}
         >
+          <AiHeaderStatus theme={theme} />
           <span className="tabular-nums">{systemTime}</span>
         </div>
       </header>

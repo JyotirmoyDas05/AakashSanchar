@@ -1,5 +1,6 @@
 "use client";
 
+import type { RegionId } from "@/lib/regions";
 import FloatingWindow from "./FloatingWindow";
 
 export interface SettingsState {
@@ -7,6 +8,7 @@ export interface SettingsState {
   timezone: string;
   dateFormat: string;
   theme: "dark" | "light";
+  regionView: RegionId;
 }
 
 interface SettingsWidgetProps {
@@ -78,7 +80,67 @@ export default function SettingsWidget({
           isLight ? "bg-white text-slate-800" : "bg-[#0a0a0c]/95 text-slate-300"
         }`}
       >
-        {/* 1. SIDEBAR LAYOUT TOGGLE */}
+        {/* 1. MAP FOCUS / REGION VIEW */}
+        <div className="flex flex-col gap-2">
+          <div
+            className={`text-[10px] font-bold tracking-wider uppercase border-b pb-1 flex items-center justify-between ${
+              isLight
+                ? "text-cyan-700 border-cyan-300"
+                : "text-cyan-400/90 border-cyan-500/20"
+            }`}
+          >
+            <span>Map Focus</span>
+            <span className="text-[9px] text-slate-500 font-normal">
+              REGIONAL LAYOUT PRESET
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-1">
+            {(
+              [
+                { id: "world", label: "World View" },
+                { id: "south-asia", label: "South Asia View" },
+              ] as { id: RegionId; label: string }[]
+            ).map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => onUpdateSettings({ regionView: r.id })}
+                className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider border rounded transition-all flex items-center justify-center gap-2 ${
+                  settings.regionView === r.id
+                    ? isLight
+                      ? "border-cyan-600 text-cyan-900 bg-cyan-100 font-bold shadow-sm"
+                      : "border-cyan-500 text-cyan-400 bg-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.3)]"
+                    : isLight
+                      ? "border-slate-300 text-slate-700 hover:border-cyan-400 hover:text-slate-900 bg-slate-50"
+                      : "border-[#222] text-slate-400 hover:border-cyan-500/60 hover:text-slate-200 bg-[#121214]"
+                }`}
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 010 18M12 3a15 15 0 000 18"
+                  />
+                </svg>
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[9px] text-slate-500 leading-relaxed">
+            South Asia view centers the map on India and its neighbours
+            (Pakistan, Bangladesh, Myanmar, Sri Lanka) and filters events to the
+            region.
+          </p>
+        </div>
+
+        {/* 2. SIDEBAR LAYOUT TOGGLE */}
         <div className="flex flex-col gap-2">
           <div
             className={`text-[10px] font-bold tracking-wider uppercase border-b pb-1 flex items-center justify-between ${
@@ -153,7 +215,7 @@ export default function SettingsWidget({
           </div>
         </div>
 
-        {/* 2. TIMEZONE SELECTION */}
+        {/* 3. TIMEZONE SELECTION */}
         <div className="flex flex-col gap-2">
           <div
             className={`text-[10px] font-bold tracking-wider uppercase border-b pb-1 flex items-center justify-between ${
@@ -192,7 +254,7 @@ export default function SettingsWidget({
           </select>
         </div>
 
-        {/* 3. DATE FORMAT */}
+        {/* 4. DATE FORMAT */}
         <div className="flex flex-col gap-2">
           <div
             className={`text-[10px] font-bold tracking-wider uppercase border-b pb-1 flex items-center justify-between ${
@@ -231,7 +293,7 @@ export default function SettingsWidget({
           </select>
         </div>
 
-        {/* 4. THEME SELECTION */}
+        {/* 5. THEME SELECTION */}
         <div className="flex flex-col gap-2">
           <div
             className={`text-[10px] font-bold tracking-wider uppercase border-b pb-1 flex items-center justify-between ${
@@ -272,7 +334,7 @@ export default function SettingsWidget({
           </div>
         </div>
 
-        {/* 5. KEYBOARD SHORTCUTS REFERENCE */}
+        {/* 6. KEYBOARD SHORTCUTS REFERENCE */}
         <div className="flex flex-col gap-2">
           <div
             className={`text-[10px] font-bold tracking-wider uppercase border-b pb-1 flex items-center justify-between ${

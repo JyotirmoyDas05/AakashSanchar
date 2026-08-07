@@ -8,9 +8,18 @@ export function filterEvents(
   events: NewsEvent[],
   activeLayers: NewsCategory[],
   timeRange: TimeRange,
+  bbox?: [number, number, number, number] | null,
 ): NewsEvent[] {
   // Filter by category
   let filtered = events.filter((e) => activeLayers.includes(e.category));
+
+  // Filter by geographic bounding box [west, south, east, north]
+  if (bbox) {
+    const [west, south, east, north] = bbox;
+    filtered = filtered.filter(
+      (e) => e.lat >= south && e.lat <= north && e.lng >= west && e.lng <= east,
+    );
+  }
 
   // Filter by time range
   let hours = 0;

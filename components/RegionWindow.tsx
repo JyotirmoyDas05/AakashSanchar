@@ -1,11 +1,24 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type StrategicAnalysisPillars,
+  synthesizeRegionIntelligence,
+} from "@/lib/intelligenceSynthesizer";
+import { calculateCoreSpatialCluster, searchEvents } from "@/lib/search";
+import { synthesizeStrategicAnalysisWithLLM } from "@/lib/webLLM";
 import type { NewsEvent } from "@/types/news";
+import { SolvingOrb } from "./SolvingOrb";
+
+const RealMiniMap = dynamic(() => import("@/components/RealMiniMap"), {
+  ssr: false,
+});
 
 interface RegionWindowProps {
   events: NewsEvent[];
   locationName: string;
+  query?: string;
   onClose: () => void;
   zIndex?: number;
   onFocus?: () => void;
@@ -32,50 +45,35 @@ const LEVEL_DOT: Record<IncidentLevel, string> = {
   LOW: "#9ca3af",
 };
 
-const LEVEL_BADGE: Record<IncidentLevel, string> = {
-  HIGH: "text-red-500 bg-red-500/10 border-red-500/25 font-bold",
-  ELEVATED: "text-orange-500 bg-orange-500/10 border-orange-500/25 font-bold",
-  MEDIUM: "text-yellow-600 bg-yellow-500/10 border-yellow-500/25 font-bold",
-  LOW: "text-slate-600 bg-slate-500/10 border-slate-500/25 font-bold",
-};
-
-function buildSummary(events: NewsEvent[]): string {
-  if (!events.length) return "No events reported.";
-  const location = events[0].locationName;
-  const cats = [...new Set(events.map((e) => e.category))];
-  const catStr = cats.includes("conflict")
-    ? "military and conflict activity"
-    : cats.includes("disaster")
-      ? "natural disaster and emergency activity"
-      : cats.includes("health")
-        ? "health and outbreak activity"
-        : "geopolitical and news activity";
-  const topTitle = events[0].title;
-  const snippet =
-    topTitle.length > 80 ? `${topTitle.substring(0, 80)}…` : topTitle;
-  return `Multiple reports of ${catStr} detected around ${location}. The situation involves ${events.length} separate incident${events.length !== 1 ? "s" : ""} across the region. ${snippet}`;
-}
-
-function buildKeyEvents(events: NewsEvent[]) {
-  return events.slice(0, 6).map((ev) => {
-    const d = new Date(ev.publishedAt);
-    const month = d.toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-    });
-    const hour = d.getHours();
-    const tod =
-      hour < 6
-        ? "night"
-        : hour < 12
-          ? "morning"
-          : hour < 17
-            ? "afternoon"
-            : hour < 21
-              ? "evening"
-              : "night";
-    return { dateLabel: `${month}, ${tod}`, title: ev.title };
-  });
+function getCoherentEvents(events: NewsEvent[], query?: string): NewsEvent[] {
+  if (!events.length) return [];
+  if (query) {
+    const res = searchEvents(events, query);
+    if (res.results.length) return res.results;
+  }
+  const tagCounts = new Map<string, number>();
+  for (const e of events) {
+    const t = e.tag || e.category;
+    tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
+  }
+  let dominant = "";
+  let maxCount = 0;
+  for (const [t, count] of tagCounts) {
+    if (count > maxCount) {
+      maxCount = count;
+      dominant = t;
+    }
+  }
+  if (dominant && dominant !== "General" && maxCount >= 2) {
+    const matched = events.filter(
+      (e) =>
+        (e.tag || e.category) === dominant ||
+        e.category === "disaster" ||
+        e.category === "conflict",
+    );
+    if (matched.length >= 3) return matched;
+  }
+  return events;
 }
 
 function MiniMapCanvas({
@@ -83,101 +81,115 @@ function MiniMapCanvas({
   lng,
   dotColor,
   isLight,
+  events,
 }: {
   lat: number;
   lng: number;
   dotColor: string;
   isLight: boolean;
+  events?: NewsEvent[];
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  return (
+    <RealMiniMap
+      lat={lat}
+      lng={lng}
+      dotColor={dotColor}
+      isLight={isLight}
+      events={events}
+    />
+  );
+}
+
+function ImageCarousel({
+  images,
+  dotColor,
+  isLight,
+  lat,
+  lng,
+  events,
+}: {
+  images: string[];
+  dotColor: string;
+  isLight: boolean;
+  lat: number;
+  lng: number;
+  events?: NewsEvent[];
+}) {
+  const [idx, setIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const imagesCount = images.length;
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const w = canvas.width;
-    const h = canvas.height;
+    if (!imagesCount || paused) return;
+    timerRef.current = setInterval(() => {
+      setIdx((i) => (i + 1) % imagesCount);
+    }, 3000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [imagesCount, paused]);
 
-    ctx.fillStyle = isLight ? "#f1f5f9" : "#070a07";
-    ctx.fillRect(0, 0, w, h);
+  useEffect(() => {
+    setIdx(0);
+  }, []);
 
-    // Grid
-    ctx.strokeStyle = isLight ? "#e2e8f0" : "#111811";
-    ctx.lineWidth = 0.5;
-    for (let x = 0; x < w; x += 20) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-      ctx.stroke();
-    }
-    for (let y = 0; y < h; y += 20) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
-    }
-
-    // Terrain blobs
-    ctx.fillStyle = isLight ? "#e2e8f0" : "#0d150d";
-    const blobs = [
-      { x: w * 0.2, y: h * 0.3, r: 28 },
-      { x: w * 0.72, y: h * 0.6, r: 42 },
-      { x: w * 0.5, y: h * 0.2, r: 22 },
-      { x: w * 0.88, y: h * 0.4, r: 32 },
-      { x: w * 0.14, y: h * 0.72, r: 38 },
-    ];
-    for (const b of blobs) {
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Coastline stroke
-    ctx.strokeStyle = isLight ? "#cbd5e1" : "#1a2a1a";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, h * 0.5);
-    ctx.bezierCurveTo(w * 0.3, h * 0.38, w * 0.62, h * 0.62, w, h * 0.44);
-    ctx.stroke();
-
-    // Glow ring
-    const cx = w / 2;
-    const cy = h / 2;
-    const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 22);
-    grad.addColorStop(0, `${dotColor}80`);
-    grad.addColorStop(1, "transparent");
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Center dot
-    ctx.fillStyle = dotColor;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Coord label
-    ctx.fillStyle = isLight ? "#475569" : "#6b7280";
-    ctx.font = "bold 7px monospace";
-    ctx.fillText(`${lat.toFixed(4)}, ${lng.toFixed(4)}`, cx - 28, cy + 20);
-  }, [lat, lng, dotColor, isLight]);
+  if (!images.length) {
+    return (
+      <MiniMapCanvas
+        lat={lat}
+        lng={lng}
+        dotColor={dotColor}
+        isLight={isLight}
+        events={events}
+      />
+    );
+  }
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={340}
-      height={110}
-      className="w-full block"
-      aria-label="Mini map"
-    />
+    <div
+      className="relative w-full h-40 overflow-hidden bg-black"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      {/* biome-ignore lint/performance/noImgElement: dynamic external news images with variable origins */}
+      <img
+        src={images[idx]}
+        alt="Event"
+        className="w-full h-full object-cover"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).style.display = "none";
+        }}
+      />
+      <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent pointer-events-none" />
+      <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-1">
+        {images.map((imgUrl, i) => (
+          <span
+            key={`carousel-dot-${imgUrl || "img"}-${i}`}
+            className={`h-1.5 w-1.5 rounded-full transition-all ${i === idx ? "bg-cyan-400 w-4" : "bg-white/40"}`}
+          />
+        ))}
+      </div>
+      <div className="absolute top-1.5 right-1.5 text-[8px] font-mono bg-black/50 text-white px-1.5 py-0.5 rounded">
+        {idx + 1}/{images.length}
+      </div>
+      {images[idx] === "" && (
+        <MiniMapCanvas
+          lat={lat}
+          lng={lng}
+          dotColor={dotColor}
+          isLight={isLight}
+        />
+      )}
+    </div>
   );
 }
 
 export default function RegionWindow({
   events,
   locationName,
+  query,
   onClose,
   zIndex = 1050,
   onFocus,
@@ -191,56 +203,176 @@ export default function RegionWindow({
   const [isMinimized, setIsMinimized] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
 
+  const [aiPillars, setAiPillars] = useState<StrategicAnalysisPillars | null>(
+    null,
+  );
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const startPos = useRef({ x: 0, y: 0 });
 
-  const level = useMemo(() => getLevelForEvents(events), [events]);
-  const dotColor = LEVEL_DOT[level];
-  const badgeClass = LEVEL_BADGE[level];
-  const summary = useMemo(() => buildSummary(events), [events]);
-  const keyEvents = useMemo(() => buildKeyEvents(events), [events]);
+  const coherentEvents = useMemo(() => {
+    return getCoherentEvents(events, query);
+  }, [events, query]);
 
-  const primaryLat = events[0]?.lat ?? 0;
-  const primaryLng = events[0]?.lng ?? 0;
+  const displayEvents = coherentEvents.length ? coherentEvents : events;
+  const isFiltered = query && displayEvents.length !== events.length;
+
+  const synthesized = useMemo(
+    () => synthesizeRegionIntelligence(displayEvents, locationName, query),
+    [displayEvents, locationName, query],
+  );
+
+  const level = useMemo(
+    () => getLevelForEvents(displayEvents),
+    [displayEvents],
+  );
+  const dotColor = LEVEL_DOT[level];
+
+  const summary = synthesized.summary;
+  const analysisPillars = synthesized.analysis;
+  const keyEvents = synthesized.keyEvents;
+
+  // Background deep strategic synthesis with WebLLM (Qwen2.5-1.5B)
+  useEffect(() => {
+    let isMounted = true;
+    setAiPillars(null);
+    setIsAiLoading(true);
+
+    synthesizeStrategicAnalysisWithLLM(displayEvents, locationName, query)
+      .then((result) => {
+        if (isMounted) {
+          if (result) setAiPillars(result);
+          setIsAiLoading(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setIsAiLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [displayEvents, locationName, query]);
+
+  const effectivePillars = useMemo(() => {
+    return {
+      impactAssessment:
+        aiPillars?.impactAssessment || analysisPillars.impactAssessment,
+      operationalDynamics:
+        aiPillars?.operationalDynamics || analysisPillars.operationalDynamics,
+      escalationOutlook:
+        aiPillars?.escalationOutlook || analysisPillars.escalationOutlook,
+      threatBreakdown: analysisPillars.threatBreakdown,
+      flashpoints: aiPillars?.flashpoints?.length
+        ? aiPillars.flashpoints
+        : analysisPillars.flashpoints,
+    };
+  }, [aiPillars, analysisPillars]);
+
+  const spatialCluster = useMemo(() => {
+    return calculateCoreSpatialCluster(displayEvents);
+  }, [displayEvents]);
+
+  const primaryLat = spatialCluster.centroid ? spatialCluster.centroid[0] : 0;
+  const primaryLng = spatialCluster.centroid ? spatialCluster.centroid[1] : 0;
+
+  const subLocationName = useMemo(() => {
+    if (!displayEvents.length) return null;
+    const core = spatialCluster.coreEvents.length
+      ? spatialCluster.coreEvents
+      : displayEvents;
+    const locCounts = new Map<string, number>();
+    for (const e of core) {
+      const raw = e.locationName;
+      if (!raw || raw === "SYSTEM STATUS") continue;
+      const parts = raw.split(/[,;/]/).map((p) => p.trim());
+      const sub = parts.length > 1 ? parts[0] : parts[parts.length - 1];
+      if (sub && sub.toUpperCase() !== locationName.toUpperCase()) {
+        locCounts.set(sub, (locCounts.get(sub) || 0) + 1);
+      }
+    }
+    let best = "";
+    let maxN = 0;
+    for (const [s, n] of locCounts) {
+      if (n > maxN) {
+        maxN = n;
+        best = s;
+      }
+    }
+    return best || null;
+  }, [displayEvents, spatialCluster, locationName]);
+
+  const images = useMemo(() => {
+    const urls = displayEvents
+      .map((e) => e.imageUrl)
+      .filter(Boolean) as string[];
+    if (!urls.length && query) {
+      const fallback = events
+        .map((e) => e.imageUrl)
+        .filter(Boolean) as string[];
+      return fallback.slice(0, 6);
+    }
+    return urls.slice(0, 6);
+  }, [displayEvents, events, query]);
 
   const activityPct = useMemo(() => {
-    if (!events.length) return 10;
-    const avg = events.reduce((s, e) => s + e.intensity, 0) / events.length;
+    if (!displayEvents.length) return 10;
+    const avg =
+      displayEvents.reduce((s, e) => s + e.intensity, 0) / displayEvents.length;
     return Math.round(avg * 90 + 10);
-  }, [events]);
+  }, [displayEvents]);
 
   const firstSeen = useMemo(() => {
-    if (!events.length) return "unknown";
-    const oldest = events.reduce((a, b) =>
+    if (!displayEvents.length) return "unknown";
+    const oldest = displayEvents.reduce((a, b) =>
       new Date(a.publishedAt) < new Date(b.publishedAt) ? a : b,
     );
     const h = Math.floor(
       (Date.now() - new Date(oldest.publishedAt).getTime()) / 3_600_000,
     );
-    return h < 1 ? "< 1h ago" : `${h}h ago`;
-  }, [events]);
+    if (h < 1) return "< 1h ago";
+    if (h === 1) return "1h ago";
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    return `${d}d ago`;
+  }, [displayEvents]);
 
-  const expiresIn = `${Math.round((100 - activityPct) * 0.48)}h`;
+  const expiresIn = useMemo(() => {
+    if (!displayEvents.length) return "48h";
+    const newest = displayEvents.reduce((a, b) =>
+      new Date(a.publishedAt) > new Date(b.publishedAt) ? a : b,
+    );
+    const ageMs = Date.now() - new Date(newest.publishedAt).getTime();
+    const remainMs = 48 * 3_600_000 - ageMs;
+    if (remainMs <= 0) return "< 1h";
+    const h = Math.ceil(remainMs / 3_600_000);
+    return `${h}h`;
+  }, [displayEvents]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging.current) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
     setPosition({
-      x: startPos.current.x + e.clientX - dragStart.current.x,
-      y: startPos.current.y + e.clientY - dragStart.current.y,
+      x: Math.max(
+        10,
+        Math.min(window.innerWidth - 350, startPos.current.x + dx),
+      ),
+      y: Math.max(
+        10,
+        Math.min(window.innerHeight - 100, startPos.current.y + dy),
+      ),
     });
   }, []);
 
   const handleMouseUp = useCallback(() => {
-    if (isDragging.current) {
-      isDragging.current = false;
-      setIsInteracting(false);
-    }
-    document.removeEventListener("mousemove", handleMouseMove);
-    document.removeEventListener("mouseup", handleMouseUp);
-  }, [handleMouseMove]);
+    isDragging.current = false;
+    setIsInteracting(false);
+  }, []);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseDown = (e: React.MouseEvent) => {
     if (isMaximized || isMinimized || e.button !== 0) return;
     if ((e.target as HTMLElement).closest("button")) return;
     isDragging.current = true;
@@ -275,7 +407,7 @@ export default function RegionWindow({
         position: "fixed",
         left: `${position.x}px`,
         top: `${position.y}px`,
-        width: "340px",
+        width: "350px",
         zIndex,
       };
 
@@ -300,13 +432,10 @@ export default function RegionWindow({
             : "bg-[#0d0d0e] border-[#222] text-slate-400"
         }`}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <SolvingOrb size={10} />
           <span
-            className="h-1.5 w-1.5 rounded-full shrink-0 animate-pulse"
-            style={{ backgroundColor: dotColor }}
-          />
-          <span
-            className={`text-[10px] font-bold tracking-widest uppercase ${
+            className={`text-[10px] font-bold tracking-widest uppercase truncate ${
               isLight ? "text-slate-900" : "text-slate-400"
             }`}
           >
@@ -395,144 +524,161 @@ export default function RegionWindow({
             onClick={onClose}
             className={`w-5 h-5 flex items-center justify-center rounded transition-colors ${
               isLight
-                ? "text-slate-600 hover:text-slate-900 hover:bg-slate-200"
-                : "text-slate-500 hover:text-white hover:bg-white/10"
+                ? "text-slate-600 hover:text-red-600 hover:bg-red-50"
+                : "text-slate-500 hover:text-red-400 hover:bg-red-500/10"
             }`}
             title="Close"
           >
             <svg
-              width="9"
-              height="9"
-              viewBox="0 0 9 9"
-              fill="none"
+              width="8"
+              height="8"
+              viewBox="0 0 8 8"
+              stroke="currentColor"
+              strokeWidth="1.2"
               aria-hidden="true"
             >
-              <path
-                d="M1 1l7 7M8 1L1 8"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
+              <line x1="1" y1="1" x2="7" y2="7" />
+              <line x1="7" y1="1" x2="1" y2="7" />
             </svg>
           </button>
         </div>
       </div>
 
-      {/* Body */}
       {!isMinimized && (
-        <div
-          className={`flex flex-col overflow-y-auto ${
-            isMaximized ? "flex-1" : "max-h-145"
-          }`}
-        >
-          {/* Level badges + location */}
-          <div className="px-4 pt-3 pb-2.5">
-            <div className="flex items-center gap-1.5 mb-2.5">
-              <span
-                className={`text-[9px] font-bold tracking-widest uppercase border px-2 py-0.5 rounded ${badgeClass}`}
-              >
-                {level}
-              </span>
-              <span
-                className={`text-[9px] font-bold tracking-widest uppercase border px-2 py-0.5 rounded ${
-                  isLight
-                    ? "text-slate-700 bg-slate-100 border-slate-300"
-                    : "text-slate-400 bg-slate-500/10 border-slate-500/25"
-                }`}
-              >
-                LEVEL {events.length}
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
+        <div className="flex-1 overflow-y-auto max-h-[calc(100vh-140px)] select-text">
+          {/* Real MiniMap or Carousel banner */}
+          <div className="relative">
+            <ImageCarousel
+              images={images}
+              dotColor={dotColor}
+              isLight={isLight}
+              lat={primaryLat}
+              lng={primaryLng}
+              events={displayEvents}
+            />
+            {/* Filtered Active Query pill */}
+            {isFiltered && (
+              <div className="absolute top-2.5 right-2.5 z-10">
+                <span className="text-[8px] font-mono font-bold tracking-widest uppercase px-2 py-0.5 rounded border bg-cyan-500/20 text-cyan-300 border-cyan-500/40 backdrop-blur-md">
+                  QUERY: {query} ({displayEvents.length})
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Region Header info */}
+          <div
+            className={`p-4 border-b ${
+              isLight ? "border-slate-200" : "border-brand-border"
+            }`}
+          >
+            <div className="flex items-center justify-between">
               <h2
-                className={`text-sm font-bold ${
-                  isLight ? "text-slate-900" : "text-white"
+                className={`text-sm font-bold tracking-tight truncate ${
+                  isLight ? "text-slate-900" : "text-slate-100"
                 }`}
               >
                 {locationName}
               </h2>
-              <span
-                className={`text-[10px] ${
-                  isLight ? "text-slate-500 font-medium" : "text-slate-500"
-                }`}
-              >
-                {events[0]?.locationName ?? ""}
-              </span>
+              {subLocationName && (
+                <span
+                  className={`text-[10px] ${
+                    isLight ? "text-slate-500 font-medium" : "text-slate-500"
+                  }`}
+                >
+                  {subLocationName}
+                </span>
+              )}
             </div>
             <p
               className={`text-[9px] mt-0.5 font-mono ${
-                isLight ? "text-slate-500 font-bold" : "text-slate-600"
+                isLight ? "text-slate-500 font-medium" : "text-slate-500"
               }`}
             >
-              {primaryLat.toFixed(4)}, {primaryLng.toFixed(4)}
+              LAT {primaryLat.toFixed(2)}° • LON {primaryLng.toFixed(2)}° •{" "}
+              {displayEvents.length} DISPATCHES
             </p>
           </div>
 
-          {/* Mini map */}
+          {/* Situation Brief */}
           <div
-            className={`border-t border-b ${
+            className={`p-4 border-b ${
               isLight ? "border-slate-200" : "border-brand-border"
             }`}
           >
-            <MiniMapCanvas
-              lat={primaryLat}
-              lng={primaryLng}
-              dotColor={dotColor}
-              isLight={isLight}
-            />
-          </div>
-
-          {/* Summary */}
-          <div className="px-4 py-3">
-            <p
-              className={`text-[9px] font-bold tracking-widest uppercase mb-1.5 ${
-                isLight ? "text-slate-600" : "text-slate-600"
-              }`}
-            >
-              Summary
+            <p className="text-[9px] font-bold tracking-widest uppercase text-slate-500 mb-1.5">
+              Situation Brief
             </p>
             <p
               className={`text-[11px] leading-relaxed ${
-                isLight ? "text-slate-800 font-semibold" : "text-slate-300"
+                isLight
+                  ? "text-slate-700 font-medium"
+                  : "text-brand-text-secondary"
               }`}
             >
               {summary}
             </p>
           </div>
 
-          {/* Key Events */}
+          {/* Key Events Timeline */}
           <div
-            className={`px-4 pb-3 border-t pt-3 ${
+            className={`p-4 border-b ${
               isLight ? "border-slate-200" : "border-brand-border"
             }`}
           >
-            <p className="text-[9px] font-bold tracking-widest uppercase text-slate-600 mb-2.5">
-              Key Events
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-slate-500">
+                Key Timeline Events
+              </p>
+              <span className="text-[9px] text-slate-500">
+                LATEST {keyEvents.length}
+              </span>
+            </div>
+
             <div className="space-y-3">
-              {keyEvents.map((ke, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: static list
-                <div key={i} className="flex gap-2.5">
+              {keyEvents.map((ke) => (
+                <div key={ke.id} className="flex gap-2.5 items-start">
                   <span
-                    className="mt-0.5 h-1.5 w-1.5 rounded-full shrink-0"
-                    style={{ backgroundColor: dotColor }}
+                    className="mt-1 h-1.5 w-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: ke.badgeColor || dotColor }}
                   />
-                  <div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <span
+                        className="text-[8px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded uppercase"
+                        style={{
+                          backgroundColor: `${ke.badgeColor}18`,
+                          color: ke.badgeColor,
+                          border: `1px solid ${ke.badgeColor}33`,
+                        }}
+                      >
+                        {ke.badge}
+                      </span>
+                      <span
+                        className={`text-[9px] font-mono shrink-0 ${
+                          isLight
+                            ? "text-slate-500 font-semibold"
+                            : "text-slate-500"
+                        }`}
+                      >
+                        {ke.dateLabel} • {ke.relativeTime}
+                      </span>
+                    </div>
                     <p
-                      className={`text-[10px] font-bold mb-0.5 ${
-                        isLight ? "text-cyan-700" : "text-cyan-500"
-                      }`}
-                    >
-                      {ke.dateLabel}
-                    </p>
-                    <p
-                      className={`text-[11px] leading-snug ${
-                        isLight
-                          ? "text-slate-800 font-semibold"
-                          : "text-slate-300"
+                      className={`text-[11px] font-bold leading-snug mb-0.5 ${
+                        isLight ? "text-slate-900" : "text-slate-100"
                       }`}
                     >
                       {ke.title}
+                    </p>
+                    <p
+                      className={`text-[10.5px] leading-relaxed ${
+                        isLight
+                          ? "text-slate-600 font-medium"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      {ke.detail}
                     </p>
                   </div>
                 </div>
@@ -540,59 +686,182 @@ export default function RegionWindow({
             </div>
           </div>
 
-          {/* Analysis heading */}
+          {/* Strategic Analysis Section */}
           <div
-            className={`px-4 pt-3 pb-1 border-t ${
+            className={`px-4 pt-3 pb-3 border-t ${
               isLight ? "border-slate-200" : "border-brand-border"
             }`}
           >
-            <p className="text-[9px] font-bold tracking-widest uppercase text-slate-600">
-              Analysis
-            </p>
-          </div>
+            <div className="flex items-center justify-between mb-2.5">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-slate-500">
+                Strategic Analysis
+              </p>
+              {aiPillars ? (
+                <span className="inline-flex items-center gap-1 text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-bold">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  AI ENRICHED (QWEN 1.5B)
+                </span>
+              ) : isAiLoading ? (
+                <span className="inline-flex items-center gap-1 text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
+                  <SolvingOrb size={10} />
+                  ANALYZING...
+                </span>
+              ) : (
+                <span
+                  className={`text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border ${
+                    isLight
+                      ? "bg-slate-100 text-slate-700 border-slate-300 font-bold"
+                      : "bg-slate-800 text-slate-400 border-slate-700"
+                  }`}
+                >
+                  TACTICAL ASSESSMENT
+                </span>
+              )}
+            </div>
 
-          {/* Activity Level */}
-          <div className="px-4 pb-3 pt-2">
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1">
+            {/* Threat Breakdown Vectors */}
+            {effectivePillars.threatBreakdown &&
+              effectivePillars.threatBreakdown.length > 0 && (
+                <div className="mb-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-[9px] font-mono text-slate-500">
+                    <span className="font-bold">PRIMARY THREAT VECTORS</span>
+                    <span>{displayEvents.length} DISPATCHES</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {effectivePillars.threatBreakdown.map((tv) => (
+                      <span
+                        key={tv.label}
+                        className={`text-[8.5px] font-mono font-bold uppercase px-2 py-0.5 rounded border flex items-center gap-1 ${
+                          tv.category === "conflict"
+                            ? "bg-red-500/10 text-red-400 border-red-500/25"
+                            : tv.category === "disaster"
+                              ? "bg-orange-500/10 text-orange-400 border-orange-500/25"
+                              : tv.category === "health"
+                                ? "bg-purple-500/10 text-purple-400 border-purple-500/25"
+                                : tv.category === "space"
+                                  ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/25"
+                                  : "bg-slate-500/10 text-slate-300 border-slate-500/25"
+                        }`}
+                      >
+                        <span>{tv.label}</span>
+                        <span className="opacity-60">({tv.pct}%)</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            {/* Tactical Flashpoints */}
+            {effectivePillars.flashpoints &&
+              effectivePillars.flashpoints.length > 0 && (
+                <div className="mb-2.5 flex items-center gap-1.5 text-[9px] font-mono flex-wrap">
+                  <span className="text-slate-500 uppercase font-bold">
+                    Flashpoints:
+                  </span>
+                  {effectivePillars.flashpoints.map((fp) => (
+                    <span
+                      key={fp}
+                      className={`px-1.5 py-0.5 rounded text-[8px] border font-bold uppercase ${
+                        isLight
+                          ? "bg-slate-100 border-slate-300 text-slate-700"
+                          : "bg-white/5 border-white/10 text-slate-300"
+                      }`}
+                    >
+                      {fp}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+            {/* Assessment Content: 3 Strategic Pillars */}
+            <div className="space-y-2 mb-3 text-[10.5px] leading-relaxed">
+              <div
+                className={`p-2.5 rounded border ${
+                  isLight
+                    ? "bg-slate-50 border-slate-200 text-slate-800"
+                    : "bg-[#0b101c]/80 border-brand-border/60 text-slate-300"
+                }`}
+              >
+                <span className="font-bold text-[9px] uppercase tracking-wider block mb-0.5 text-orange-500">
+                  • Impact & Infrastructure
+                </span>
+                {effectivePillars.impactAssessment}
+              </div>
+
+              <div
+                className={`p-2.5 rounded border ${
+                  isLight
+                    ? "bg-slate-50 border-slate-200 text-slate-800"
+                    : "bg-[#0b101c]/80 border-brand-border/60 text-slate-300"
+                }`}
+              >
+                <span className="font-bold text-[9px] uppercase tracking-wider block mb-0.5 text-emerald-500">
+                  • Operations & Response
+                </span>
+                {effectivePillars.operationalDynamics}
+              </div>
+
+              <div
+                className={`p-2.5 rounded border ${
+                  isLight
+                    ? "bg-slate-50 border-slate-200 text-slate-800"
+                    : "bg-[#0b101c]/80 border-brand-border/60 text-slate-300"
+                }`}
+              >
+                <span className="font-bold text-[9px] uppercase tracking-wider block mb-0.5 text-cyan-500">
+                  • Trajectory & Outlook (24–48h)
+                </span>
+                {effectivePillars.escalationOutlook}
+              </div>
+            </div>
+
+            {/* Activity Level Gauge */}
+            <div
+              className={`rounded p-2.5 border ${
+                isLight
+                  ? "bg-slate-50 border-slate-200"
+                  : "bg-black/30 border-brand-border"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
                 <p
                   className={`text-[9px] font-bold tracking-widest uppercase ${
                     isLight ? "text-slate-700" : "text-slate-400"
                   }`}
                 >
-                  Activity Level
+                  Activity Level ({activityPct}%)
                 </p>
+                <span className="text-[9px] text-slate-500 font-medium">
+                  Updated {firstSeen}
+                </span>
               </div>
-              <span className="text-[9px] text-slate-500 font-medium">
-                Updated {firstSeen}
-              </span>
-            </div>
-            <div
-              className={`h-1.5 rounded-full overflow-hidden mb-2 ${
-                isLight ? "bg-slate-200" : "bg-brand-border"
-              }`}
-            >
               <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{
-                  width: `${activityPct}%`,
-                  backgroundColor: dotColor,
-                  boxShadow: `0 0 6px ${dotColor}55`,
-                }}
-              />
-            </div>
-            <p
-              className={`text-[9px] leading-relaxed mb-2 ${
-                isLight ? "text-slate-600 font-medium" : "text-slate-600"
-              }`}
-            >
-              Activity level reflects how actively this area is being reported
-              on. Each new development resets the timer. The bar depletes over
-              48h — once empty, the marker is removed from the map.
-            </p>
-            <div className="flex justify-between text-[9px] text-slate-500 font-medium">
-              <span>First seen: {firstSeen}</span>
-              <span>Expires in {expiresIn}</span>
+                className={`h-1.5 rounded-full overflow-hidden mb-2 ${
+                  isLight ? "bg-slate-200" : "bg-brand-border"
+                }`}
+              >
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{
+                    width: `${activityPct}%`,
+                    backgroundColor: dotColor,
+                    boxShadow: `0 0 6px ${dotColor}55`,
+                  }}
+                />
+              </div>
+              <p
+                className={`text-[9px] leading-relaxed mb-2 ${
+                  isLight ? "text-slate-600 font-medium" : "text-slate-500"
+                }`}
+              >
+                Activity level reflects signal reporting density across the
+                region. The index resets on new developments and gradually
+                decays over 48 hours.
+              </p>
+              <div className="flex justify-between text-[9px] text-slate-500 font-medium">
+                <span>First seen: {firstSeen}</span>
+                <span>Expires in {expiresIn}</span>
+              </div>
             </div>
           </div>
 
@@ -603,9 +872,9 @@ export default function RegionWindow({
             }`}
           >
             <p className="text-[10px] text-slate-500 leading-relaxed italic">
-              Disclaimer: This is an AI-powered summary. It may contain
-              inaccuracies. It does not take a political stance and is provided
-              for informational purposes only.
+              Disclaimer: This is an AI-powered strategic analysis (WebLLM
+              Qwen2.5-1.5B on-device, cached). Provided for situational
+              awareness and monitoring purposes.
             </p>
           </div>
         </div>

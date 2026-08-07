@@ -187,7 +187,7 @@ export default function WireWorkspace({
                     <span
                       className={`rounded px-1.5 py-0.5 text-[8px] font-bold uppercase border ${styles.bg} ${styles.text} ${styles.border}`}
                     >
-                      {labelForCategory(ev.category)}
+                      {(ev.tag ?? labelForCategory(ev.category)).toUpperCase()}
                     </span>
                     <span
                       className={`font-semibold ${

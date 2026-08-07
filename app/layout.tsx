@@ -14,9 +14,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aegis Sentinel | Cyber News Intelligence Grid",
+  title: "AakashSanchar | SouthEast Asia Intel Dashboard",
   description:
-    "Advanced OSINT situational awareness dashboard visualizing real-time global hotspots and news feeds.",
+    "Advanced OSINT situational awareness dashboard visualizing real-time SouthEast Asia hotspots and news feeds.",
 };
 
 export default function RootLayout({

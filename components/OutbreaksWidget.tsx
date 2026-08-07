@@ -1,17 +1,11 @@
 "use client";
 
+import { deriveOutbreaks, type OutbreakSignal } from "@/lib/deriveOutbreaks";
+import type { NewsEvent } from "@/types/news";
 import FloatingWindow from "./FloatingWindow";
 
-interface OutbreakItem {
-  id: string;
-  pathogen: string;
-  location: string;
-  cases: number;
-  deaths: number;
-  cfr: string; // Case Fatality Rate
-}
-
 interface OutbreaksWidgetProps {
+  events: NewsEvent[];
   onClose: () => void;
   defaultPosition?: { x: number; y: number };
   zIndex?: number;
@@ -20,50 +14,22 @@ interface OutbreaksWidgetProps {
   layoutMode?: "sidebar" | "floating";
 }
 
-const OUTBREAKS: OutbreakItem[] = [
-  {
-    id: "outb-1",
-    pathogen: "Ebola (Sudan Strain)",
-    location: "Bundibugyo, Uganda",
-    cases: 28,
-    deaths: 16,
-    cfr: "57.1%",
-  },
-  {
-    id: "outb-2",
-    pathogen: "Hantavirus (Shipboard)",
-    location: "Miami Harbor, FL",
-    cases: 14,
-    deaths: 5,
-    cfr: "35.7%",
-  },
-  {
-    id: "outb-3",
-    pathogen: "Avian Influenza (H5N1)",
-    location: "Tokyo, Japan",
-    cases: 8,
-    deaths: 4,
-    cfr: "50.0%",
-  },
-  {
-    id: "outb-4",
-    pathogen: "Lassa Fever (Rural)",
-    location: "Edo State, Nigeria",
-    cases: 84,
-    deaths: 18,
-    cfr: "21.4%",
-  },
-  {
-    id: "outb-5",
-    pathogen: "Marburg Virus",
-    location: "Kigali, Rwanda",
-    cases: 3,
-    deaths: 2,
-    cfr: "66.7%",
-  },
-];
+function formatLastSeen(iso: string): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+}
 
 export default function OutbreaksWidget({
+  events,
   onClose,
   defaultPosition = { x: 220, y: 220 },
   zIndex,
@@ -72,6 +38,7 @@ export default function OutbreaksWidget({
   layoutMode = "sidebar",
 }: OutbreaksWidgetProps) {
   const isLight = theme === "light";
+  const signals: OutbreakSignal[] = deriveOutbreaks(events);
 
   return (
     <FloatingWindow
@@ -106,69 +73,79 @@ export default function OutbreaksWidget({
       >
         {/* Outbreaks table view */}
         <div className="p-2.5 flex-1 min-h-0 overflow-y-auto">
-          <table className="w-full text-left text-[10px] font-mono leading-normal border-collapse">
-            <thead>
-              <tr
-                className={`border-b font-bold uppercase tracking-wider ${
-                  isLight
-                    ? "border-slate-200 text-slate-700"
-                    : "border-[#222] text-slate-500"
+          {signals.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-center px-4">
+              <p
+                className={`text-[10px] font-bold tracking-widest leading-relaxed ${
+                  isLight ? "text-emerald-700" : "text-emerald-500"
                 }`}
               >
-                <th className="pb-2">PATHOGEN / VIRUS</th>
-                <th className="pb-2">LOCATION</th>
-                <th className="pb-2 text-right">CASES</th>
-                <th className="pb-2 text-right">DEATHS</th>
-                <th className="pb-2 text-right">CFR</th>
-              </tr>
-            </thead>
-            <tbody
-              className={`divide-y ${
-                isLight ? "divide-slate-200" : "divide-[#222]/40"
-              }`}
-            >
-              {OUTBREAKS.map((o) => (
+                NO ACTIVE OUTBREAK SIGNALS IN CURRENT FEED
+              </p>
+            </div>
+          ) : (
+            <table className="w-full text-left text-[10px] font-mono leading-normal border-collapse">
+              <thead>
                 <tr
-                  key={o.id}
-                  className={`transition-colors ${
-                    isLight ? "hover:bg-slate-50" : "hover:bg-brand-border/20"
+                  className={`border-b font-bold uppercase tracking-wider ${
+                    isLight
+                      ? "border-slate-200 text-slate-700"
+                      : "border-[#222] text-slate-500"
                   }`}
                 >
-                  <td
-                    className={`py-2.5 font-bold ${
-                      isLight ? "text-slate-900" : "text-slate-200"
-                    }`}
-                  >
-                    {o.pathogen}
-                  </td>
-                  <td
-                    className={`py-2.5 truncate max-w-22.5 ${
-                      isLight ? "text-slate-600 font-medium" : "text-slate-400"
-                    }`}
-                  >
-                    {o.location}
-                  </td>
-                  <td
-                    className={`py-2.5 text-right tabular-nums ${
-                      isLight ? "text-slate-900 font-bold" : "text-slate-300"
-                    }`}
-                  >
-                    {o.cases}
-                  </td>
-                  <td className="py-2.5 text-right tabular-nums text-red-600 font-bold">
-                    {o.deaths}
-                  </td>
-                  <td
-                    className={`py-2.5 text-right tabular-nums font-bold ${
-                      isLight ? "text-rose-700" : "text-rose-400"
-                    }`}
-                  >
-                    {o.cfr}
-                  </td>
+                  <th className="pb-2">PATHOGEN</th>
+                  <th className="pb-2">LOCATION</th>
+                  <th className="pb-2 text-right">RPTS</th>
+                  <th className="pb-2 text-right">LAST</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody
+                className={`divide-y ${
+                  isLight ? "divide-slate-200" : "divide-[#222]/40"
+                }`}
+              >
+                {signals.map((o) => (
+                  <tr
+                    key={o.id}
+                    className={`transition-colors ${
+                      isLight ? "hover:bg-slate-50" : "hover:bg-brand-border/20"
+                    }`}
+                  >
+                    <td
+                      className={`py-2.5 font-bold ${
+                        isLight ? "text-slate-900" : "text-slate-200"
+                      }`}
+                    >
+                      {o.pathogen}
+                    </td>
+                    <td
+                      className={`py-2.5 truncate max-w-22.5 ${
+                        isLight
+                          ? "text-slate-600 font-medium"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      {o.location}
+                    </td>
+                    <td
+                      className={`py-2.5 text-right tabular-nums font-bold ${
+                        isLight ? "text-rose-700" : "text-rose-400"
+                      }`}
+                    >
+                      {o.reports}
+                    </td>
+                    <td
+                      className={`py-2.5 text-right tabular-nums ${
+                        isLight ? "text-slate-700" : "text-slate-400"
+                      }`}
+                    >
+                      {formatLastSeen(o.lastSeen)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Footer warning */}
@@ -179,7 +156,9 @@ export default function OutbreaksWidget({
               : "bg-[#220d0d]/35 text-red-400 border-[#222]"
           }`}
         >
-          WARNING: SCREEN FOR GLOBAL HIGH-THREAT PATHOGENS ACTIVE
+          {signals.length > 0
+            ? `LIVE · ${signals.length} PATHOGEN SIGNAL(S) FROM NEWS MONITORING`
+            : "LIVE · DERIVED FROM GDELT HEALTH EVENTS"}
         </div>
       </div>
     </FloatingWindow>

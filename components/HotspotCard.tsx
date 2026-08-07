@@ -2,44 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import { extractTitleFromUrl } from "@/lib/articleTitle";
+import { deriveTag } from "@/lib/deriveTags";
+import { detectSourceLang } from "@/lib/detectLang";
+import { bucketForTag } from "@/lib/tagPalette";
 import type { NewsEvent } from "@/types/news";
 
-type IncidentType = "MILITARY" | "INCIDENT";
-type IncidentLevel = "HIGH" | "MEDIUM" | "LOW";
-
-function classifyEvent(event: NewsEvent): {
-  type: IncidentType;
-  level: IncidentLevel;
-} {
-  const t = `${event.title} ${event.description}`.toLowerCase();
-  const isMilitary =
-    t.includes("military") ||
-    t.includes("war") ||
-    t.includes("attack") ||
-    t.includes("airstrike") ||
-    t.includes("missile") ||
-    t.includes("troops") ||
-    t.includes("bomb") ||
-    t.includes("combat") ||
-    event.category === "conflict";
-
-  let level: IncidentLevel = "LOW";
-  if (event.intensity >= 0.7) level = "HIGH";
-  else if (event.intensity >= 0.4) level = "MEDIUM";
-
-  return { type: isMilitary ? "MILITARY" : "INCIDENT", level };
+function tagBadgeClasses(bucket: string, isLight: boolean): string {
+  if (bucket === "conflict")
+    return "text-red-500 bg-red-500/10 border-red-500/25";
+  if (bucket === "disaster")
+    return "text-orange-500 bg-orange-500/10 border-orange-500/25";
+  if (bucket === "health")
+    return "text-purple-500 bg-purple-500/10 border-purple-500/25";
+  if (bucket === "space")
+    return "text-cyan-500 bg-cyan-500/10 border-cyan-500/25";
+  return isLight
+    ? "text-slate-600 bg-slate-100 border-slate-300"
+    : "text-slate-400 bg-slate-500/10 border-slate-500/25";
 }
-
-const LEVEL_BADGE: Record<IncidentLevel, string> = {
-  HIGH: "text-red-500 bg-red-500/10 border-red-500/25",
-  MEDIUM: "text-orange-500 bg-orange-500/10 border-orange-500/25",
-  LOW: "text-yellow-600 bg-yellow-500/10 border-yellow-500/25",
-};
-
-const TYPE_BADGE: Record<IncidentType, string> = {
-  MILITARY: "text-red-500 bg-red-500/10 border-red-500/25",
-  INCIDENT: "text-slate-500 bg-slate-500/10 border-slate-500/25",
-};
 
 interface ExternalLinkModalProps {
   url: string;
@@ -203,6 +183,9 @@ export default function HotspotCard({
   const [translated, setTranslated] = useState(false);
 
   const [isTranslating, setIsTranslating] = useState(false);
+  const [translateState, setTranslateState] = useState<
+    "idle" | "english" | "unavailable"
+  >("idle");
   const [externalLink, setExternalLink] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const externalLinkRef = useRef<string | null>(null);
@@ -229,7 +212,18 @@ export default function HotspotCard({
     };
   }, [event.url, event.title]);
 
-  const { type, level } = classifyEvent(event);
+  // After translation, re-derive tag from English so Tamil/Burmese "General" becomes topic-correct
+  const displayTagRaw = (() => {
+    if (translated) {
+      try {
+        const d = deriveTag(fullTitle, event.description, event.source);
+        if (d.tag !== "General") return d.tag;
+      } catch {}
+    }
+    return event.tag ?? event.category;
+  })();
+  const bucket = bucketForTag(displayTagRaw);
+  const tagLabel = displayTagRaw.toUpperCase();
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -242,12 +236,35 @@ export default function HotspotCard({
     return () => document.removeEventListener("mousedown", handleOutside);
   }, [onClose]);
 
-  function handleTranslate() {
+  async function handleTranslate() {
+    if (translated || isTranslating) return;
+
+    const from = detectSourceLang(fullTitle);
+    if (!from) {
+      setTranslateState("english");
+      return;
+    }
+
     setIsTranslating(true);
-    setTimeout(() => {
-      setTranslated(true);
+    try {
+      const res = await fetch(
+        `/api/translate?text=${encodeURIComponent(
+          fullTitle,
+        )}&from=${from}&to=en`,
+      );
+      if (!res.ok) throw new Error("translate failed");
+      const data = await res.json();
+      if (data?.translated && data.text && data.text !== fullTitle) {
+        setFullTitle(data.text);
+        setTranslated(true);
+      } else {
+        setTranslateState("english");
+      }
+    } catch {
+      setTranslateState("unavailable");
+    } finally {
       setIsTranslating(false);
-    }, 600);
+    }
   }
 
   const dateStr = (() => {
@@ -299,34 +316,47 @@ export default function HotspotCard({
             : "border-[#222] bg-brand-bg/95 text-slate-200 shadow-2xl backdrop-blur-md"
         }`}
       >
-        {/* Tags row */}
+        {/* Tags row — single dynamic topic chip (keeps minimal 9px pill style) */}
         <div className="flex items-center justify-between px-3 pt-3 pb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span
-              className={`inline-flex items-center px-2 py-0.5 text-[9px] font-bold tracking-widest uppercase border rounded ${TYPE_BADGE[type]}`}
+              className={`inline-flex items-center px-2 py-0.5 text-[9px] font-bold tracking-widest uppercase border rounded ${tagBadgeClasses(bucket, isLight)}`}
             >
-              {type}
-            </span>
-            <span
-              className={`inline-flex items-center px-2 py-0.5 text-[9px] font-bold tracking-widest uppercase border rounded ${LEVEL_BADGE[level]}`}
-            >
-              {level}
+              {tagLabel}
             </span>
             <button
               type="button"
               onClick={handleTranslate}
-              disabled={translated || isTranslating}
+              disabled={
+                translated ||
+                isTranslating ||
+                translateState === "english" ||
+                translateState === "unavailable"
+              }
               className={`inline-flex items-center px-2 py-0.5 text-[9px] font-bold tracking-widest uppercase border rounded transition-colors ${
                 translated
                   ? isLight
                     ? "text-cyan-800 bg-cyan-100 border-cyan-300 font-bold"
                     : "text-cyan-400 bg-cyan-500/10 border-cyan-500/25"
-                  : isLight
-                    ? "text-slate-600 bg-slate-100 border-slate-300 hover:text-cyan-800 hover:border-cyan-400"
-                    : "text-slate-400 bg-transparent border-[#333] hover:text-cyan-400 hover:border-cyan-500/40"
+                  : translateState === "english" ||
+                      translateState === "unavailable"
+                    ? isLight
+                      ? "text-slate-400 bg-slate-100 border-slate-200 cursor-not-allowed"
+                      : "text-slate-600 bg-transparent border-[#222] cursor-not-allowed"
+                    : isLight
+                      ? "text-slate-600 bg-slate-100 border-slate-300 hover:text-cyan-800 hover:border-cyan-400"
+                      : "text-slate-400 bg-transparent border-[#333] hover:text-cyan-400 hover:border-cyan-500/40"
               }`}
             >
-              {isTranslating ? "···" : translated ? "TRANSLATED" : "TRANSLATE"}
+              {isTranslating
+                ? "···"
+                : translated
+                  ? "TRANSLATED"
+                  : translateState === "english"
+                    ? "ENGLISH"
+                    : translateState === "unavailable"
+                      ? "UNAVAILABLE"
+                      : "TRANSLATE"}
             </button>
           </div>
 
@@ -357,14 +387,16 @@ export default function HotspotCard({
           </button>
         </div>
 
-        {/* Location mention */}
+        {/* Location mention — for RSS markers we label as reported-from to avoid "mentioned" false-positives */}
         <div className="px-3 pb-1">
           <p
             className={`text-[10px] font-bold tracking-wide ${
               isLight ? "text-cyan-700" : "text-cyan-500"
             }`}
           >
-            {event.locationName} mentioned in article:
+            {event.id.startsWith("rss-")
+              ? `Reported from ${event.locationName}:`
+              : `${event.locationName} mentioned in article:`}
           </p>
         </div>
 

@@ -10,6 +10,8 @@
     "format": "biome format --write"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@mlc-ai/web-llm": "^0.2.84",
     "framer-motion": "^12.42.2",
     "hls.js": "^1.6.16",
     "leaflet": "^1.9.4",
@@ -29,6 +31,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4.3.2",
+    "tsx": "^4.23.12",
     "typescript": "^5.7.3"
   }
 }

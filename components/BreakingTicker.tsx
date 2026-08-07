@@ -1,29 +1,29 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { deriveTag } from "@/lib/deriveTags";
+import { detectSourceLang } from "@/lib/detectLang";
 import { formatTime } from "@/lib/formatTime";
+import {
+  BUCKET_BG_CLASS,
+  BUCKET_TEXT_CLASS,
+  bucketForTag,
+} from "@/lib/tagPalette";
+import { annotateArticleWithLLM } from "@/lib/webLLM";
 import type { NewsCategory, NewsEvent } from "@/types/news";
+import { SolvingOrb } from "./SolvingOrb";
 
 interface BreakingTickerProps {
   events: NewsEvent[];
   theme?: "dark" | "light";
 }
 
-const CATEGORY_COLORS: Record<NewsCategory, string> = {
-  news: "text-cat-news",
-  conflict: "text-cat-conflict",
-  disaster: "text-cat-disaster",
-  health: "text-cat-health",
-  space: "text-cat-space",
-};
-
-const CATEGORY_ACCENT_BG: Record<NewsCategory, string> = {
-  news: "bg-cat-news",
-  conflict: "bg-cat-conflict",
-  disaster: "bg-cat-disaster",
-  health: "bg-cat-health",
-  space: "bg-cat-space",
-};
+interface TranslationRecord {
+  title: string;
+  description: string;
+  tag: string;
+  bucket: NewsCategory;
+}
 
 export default function BreakingTicker({
   events,
@@ -37,7 +37,216 @@ export default function BreakingTicker({
   const [isMarqueeHovered, setIsMarqueeHovered] = useState(false);
   const [isTooltipHovered, setIsTooltipHovered] = useState(false);
 
+  const [translatedOverrides, setTranslatedOverrides] = useState<
+    Record<string, TranslationRecord>
+  >({});
+  const translationCache = useRef<Map<string, TranslationRecord>>(new Map());
+
+  const [translatedTitle, setTranslatedTitle] = useState<string | null>(null);
+  const [translatedDescription, setTranslatedDescription] = useState<
+    string | null
+  >(null);
+  const [translateStatus, setTranslateStatus] = useState<
+    "idle" | "loading" | "done" | "english" | "unavailable"
+  >("idle");
+
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const hoveredEventId = hoveredEvent?.id;
+
+  // Reset or load cached translation whenever hovered article changes
+  useEffect(() => {
+    if (!hoveredEventId) {
+      setTranslatedTitle(null);
+      setTranslatedDescription(null);
+      setTranslateStatus("idle");
+      return;
+    }
+
+    const cached =
+      translationCache.current.get(hoveredEventId) ||
+      translatedOverrides[hoveredEventId];
+    if (cached) {
+      setTranslatedTitle(cached.title);
+      setTranslatedDescription(cached.description);
+      setTranslateStatus("done");
+    } else {
+      setTranslatedTitle(null);
+      setTranslatedDescription(null);
+      setTranslateStatus("idle");
+    }
+  }, [hoveredEventId, translatedOverrides]);
+
+  // Background deep AI annotation for hovered item
+  useEffect(() => {
+    if (!hoveredEvent || hoveredEvent.locationName === "SYSTEM STATUS") return;
+    const currentId = hoveredEvent.id;
+    let isMounted = true;
+
+    if (translatedOverrides[currentId]) return;
+
+    annotateArticleWithLLM(
+      hoveredEvent.title,
+      hoveredEvent.description,
+      hoveredEvent.source,
+    ).then((res) => {
+      if (!isMounted || !res) return;
+      setTranslatedOverrides((prev) => {
+        if (
+          prev[currentId]?.title &&
+          prev[currentId]?.title !== hoveredEvent.title
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [currentId]: {
+            title: hoveredEvent.title,
+            description: res.cleanedSummary || hoveredEvent.description,
+            tag: res.tag,
+            bucket: res.bucket,
+          },
+        };
+      });
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [hoveredEvent, translatedOverrides]);
+
+  const sourceLang = hoveredEvent
+    ? detectSourceLang(hoveredEvent.title) ||
+      detectSourceLang(hoveredEvent.description) ||
+      null
+    : null;
+
+  // Derive dynamic tag and bucket for the hovered event
+  const displayTag = (() => {
+    if (!hoveredEvent) return "GENERAL";
+    if (hoveredEventId && translatedOverrides[hoveredEventId]) {
+      return translatedOverrides[hoveredEventId].tag.toUpperCase();
+    }
+    if (translatedTitle) {
+      try {
+        const derived = deriveTag(
+          translatedTitle,
+          translatedDescription ?? hoveredEvent.description,
+          hoveredEvent.source,
+        );
+        if (derived.tag !== "General") return derived.tag.toUpperCase();
+      } catch {}
+    }
+    return (hoveredEvent.tag ?? hoveredEvent.category).toUpperCase();
+  })();
+
+  const displayBucket = (() => {
+    if (!hoveredEvent) return "news" as const;
+    if (hoveredEventId && translatedOverrides[hoveredEventId]) {
+      return translatedOverrides[hoveredEventId].bucket;
+    }
+    if (translatedTitle) {
+      try {
+        const derived = deriveTag(
+          translatedTitle,
+          translatedDescription ?? hoveredEvent.description,
+          hoveredEvent.source,
+        );
+        if (derived.tag !== "General") return derived.bucket;
+      } catch {}
+    }
+    return bucketForTag(hoveredEvent.tag ?? hoveredEvent.category);
+  })();
+
+  async function handleTranslate() {
+    if (
+      !hoveredEvent ||
+      translateStatus === "loading" ||
+      translateStatus === "done"
+    ) {
+      return;
+    }
+    const from =
+      detectSourceLang(hoveredEvent.title) ||
+      detectSourceLang(hoveredEvent.description);
+    if (!from) {
+      setTranslateStatus("english");
+      return;
+    }
+    setTranslateStatus("loading");
+    try {
+      const titlePromise = fetch(
+        `/api/translate?text=${encodeURIComponent(hoveredEvent.title)}&from=${from}&to=en`,
+      ).then(async (res) => {
+        if (!res.ok) throw new Error("title translate failed");
+        const data = await res.json();
+        return data?.translated && data.text && data.text !== hoveredEvent.title
+          ? data.text
+          : null;
+      });
+
+      const descPromise =
+        hoveredEvent.description && hoveredEvent.description.trim().length > 0
+          ? fetch(
+              `/api/translate?text=${encodeURIComponent(hoveredEvent.description)}&from=${from}&to=en`,
+            )
+              .then(async (res) => {
+                if (!res.ok) return null;
+                const data = await res.json();
+                return data?.translated &&
+                  data.text &&
+                  data.text !== hoveredEvent.description
+                  ? data.text
+                  : null;
+              })
+              .catch(() => null)
+          : Promise.resolve(null);
+
+      const [newTitle, newDesc] = await Promise.all([
+        titlePromise,
+        descPromise,
+      ]);
+
+      if (newTitle || newDesc) {
+        const effectiveTitle = newTitle || hoveredEvent.title;
+        const effectiveDesc = newDesc || hoveredEvent.description;
+        const derived = deriveTag(
+          effectiveTitle,
+          effectiveDesc,
+          hoveredEvent.source,
+        );
+        const newTag =
+          derived.tag !== "General"
+            ? derived.tag
+            : (hoveredEvent.tag ?? hoveredEvent.category);
+        const newBucket =
+          derived.tag !== "General"
+            ? derived.bucket
+            : bucketForTag(hoveredEvent.tag ?? hoveredEvent.category);
+
+        const record: TranslationRecord = {
+          title: effectiveTitle,
+          description: effectiveDesc,
+          tag: newTag,
+          bucket: newBucket,
+        };
+
+        translationCache.current.set(hoveredEvent.id, record);
+        setTranslatedOverrides((prev) => ({
+          ...prev,
+          [hoveredEvent.id]: record,
+        }));
+
+        if (newTitle) setTranslatedTitle(newTitle);
+        if (newDesc) setTranslatedDescription(newDesc);
+        setTranslateStatus("done");
+      } else {
+        setTranslateStatus("english");
+      }
+    } catch {
+      setTranslateStatus("unavailable");
+    }
+  }
 
   const isPaused = isMarqueeHovered || isTooltipHovered;
 
@@ -45,11 +254,12 @@ export default function BreakingTicker({
   const mockSystemEvents: NewsEvent[] = [
     {
       id: "sys-1",
-      title: "AEGIS TELEMETRY GRID COMPILING...",
+      title: "AAKASH TELEMETRY GRID COMPILING...",
       description:
         "Initializing satellite downlinks and compiling core database files.",
       source: "#",
       category: "news",
+      tag: "General",
       publishedAt: new Date().toISOString(),
       locationName: "SYSTEM STATUS",
       lat: 0,
@@ -63,6 +273,7 @@ export default function BreakingTicker({
         "All space-based sensor platforms report operational readiness.",
       source: "#",
       category: "news",
+      tag: "General",
       publishedAt: new Date().toISOString(),
       locationName: "SYSTEM STATUS",
       lat: 0,
@@ -75,6 +286,7 @@ export default function BreakingTicker({
       description: "Listening on GDELT wire and global news stream protocols.",
       source: "#",
       category: "news",
+      tag: "General",
       publishedAt: new Date().toISOString(),
       locationName: "SYSTEM STATUS",
       lat: 0,
@@ -83,8 +295,25 @@ export default function BreakingTicker({
     },
   ];
 
-  // Show system placeholder events until real articles arrive
   const displayEvents = events.length > 0 ? events : mockSystemEvents;
+
+  function getEventTitle(e: NewsEvent): string {
+    return translatedOverrides[e.id]?.title ?? e.title;
+  }
+
+  function getEventTagLabel(e: NewsEvent): string {
+    return (
+      translatedOverrides[e.id]?.tag ??
+      e.tag ??
+      e.category
+    ).toUpperCase();
+  }
+
+  function getEventBucket(e: NewsEvent): NewsCategory {
+    return (
+      translatedOverrides[e.id]?.bucket ?? bucketForTag(e.tag ?? e.category)
+    );
+  }
 
   const handleMarqueeMouseEnter = () => {
     if (isMarqueeHovered) return;
@@ -103,7 +332,6 @@ export default function BreakingTicker({
     }, 180);
   };
 
-  // handles mouse enter on ticker item
   const handleItemMouseEnter = (
     event: NewsEvent,
     e: React.MouseEvent<HTMLSpanElement>,
@@ -189,20 +417,20 @@ export default function BreakingTicker({
               >
                 <span
                   className={`${
-                    CATEGORY_COLORS[e.category] ||
+                    BUCKET_TEXT_CLASS[getEventBucket(e)] ||
                     (isLight ? "text-slate-600" : "text-brand-text-secondary")
                   } font-bold select-none text-[9px] tracking-wide mr-1.5`}
                 >
                   {e.locationName && e.locationName !== "SYSTEM STATUS"
-                    ? `[${e.category.toUpperCase()} · ${e.locationName.toUpperCase()}]`
-                    : `[${e.category.toUpperCase()}]`}
+                    ? `[${getEventTagLabel(e)} · ${e.locationName.toUpperCase()}]`
+                    : `[${getEventTagLabel(e)}]`}
                 </span>
                 <span
                   className={
                     isLight ? "text-slate-900 font-bold" : "text-slate-350"
                   }
                 >
-                  {e.title.toUpperCase()}
+                  {getEventTitle(e).toUpperCase()}
                 </span>
                 <span className="text-brand-border font-mono select-none px-4">
                   •
@@ -220,13 +448,15 @@ export default function BreakingTicker({
                 onMouseEnter={(evt) => handleItemMouseEnter(e, evt)}
               >
                 <span
-                  className={`${CATEGORY_COLORS[e.category] || "text-brand-text-secondary"} font-bold select-none text-[9px] tracking-wide mr-1.5`}
+                  className={`${BUCKET_TEXT_CLASS[getEventBucket(e)] || "text-brand-text-secondary"} font-bold select-none text-[9px] tracking-wide mr-1.5`}
                 >
                   {e.locationName && e.locationName !== "SYSTEM STATUS"
-                    ? `[${e.category.toUpperCase()} · ${e.locationName.toUpperCase()}]`
-                    : `[${e.category.toUpperCase()}]`}
+                    ? `[${getEventTagLabel(e)} · ${e.locationName.toUpperCase()}]`
+                    : `[${getEventTagLabel(e)}]`}
                 </span>
-                <span className="text-slate-350">{e.title.toUpperCase()}</span>
+                <span className="text-slate-350">
+                  {getEventTitle(e).toUpperCase()}
+                </span>
                 <span className="text-brand-border font-mono select-none px-4">
                   •
                 </span>
@@ -250,7 +480,7 @@ export default function BreakingTicker({
         >
           {/* Category accent bar */}
           <div
-            className={`h-0.75 w-full ${CATEGORY_ACCENT_BG[hoveredEvent.category] || "bg-cyan-500"} opacity-90`}
+            className={`h-0.75 w-full ${BUCKET_BG_CLASS[displayBucket] || "bg-cyan-500"} opacity-90`}
           />
 
           {/* Main content */}
@@ -259,18 +489,18 @@ export default function BreakingTicker({
             <div className="flex items-center gap-2">
               <span
                 className={`text-[8px] font-mono font-bold tracking-widest uppercase px-1.5 py-0.5 rounded border ${
-                  hoveredEvent.category === "conflict"
+                  displayBucket === "conflict"
                     ? "border-red-500/20 text-cat-conflict bg-red-500/10"
-                    : hoveredEvent.category === "disaster"
+                    : displayBucket === "disaster"
                       ? "border-orange-500/20 text-cat-disaster bg-orange-500/10"
-                      : hoveredEvent.category === "health"
+                      : displayBucket === "health"
                         ? "border-purple-500/20 text-cat-health bg-purple-500/10"
-                        : hoveredEvent.category === "space"
+                        : displayBucket === "space"
                           ? "border-cyan-500/20 text-cat-space bg-cyan-500/10"
                           : "border-slate-500/20 text-cat-news bg-slate-500/10"
                 }`}
               >
-                {hoveredEvent.category}
+                {displayTag}
               </span>
               <span
                 className={`text-[9px] font-mono uppercase tracking-wide ${
@@ -309,10 +539,19 @@ export default function BreakingTicker({
                 isLight ? "text-slate-900" : "text-brand-text-primary"
               }`}
             >
-              {hoveredEvent.title}
+              {translatedTitle ?? hoveredEvent.title}
             </h4>
+            {translateStatus === "done" && (
+              <span
+                className={`text-[8px] font-mono font-bold uppercase tracking-widest ${
+                  isLight ? "text-emerald-700" : "text-emerald-500"
+                }`}
+              >
+                ▼ Translated from {sourceLang || "source language"}
+              </span>
+            )}
 
-            {/* Description — scrollable if very long */}
+            {/* Description */}
             <div className="max-h-40 overflow-y-auto pr-1">
               <p
                 className={`font-sans text-[11px] leading-relaxed ${
@@ -321,7 +560,9 @@ export default function BreakingTicker({
                     : "text-brand-text-secondary"
                 }`}
               >
-                {hoveredEvent.description}
+                {translatedDescription ??
+                  translatedOverrides[hoveredEvent.id]?.description ??
+                  hoveredEvent.description}
               </p>
             </div>
 
@@ -341,19 +582,58 @@ export default function BreakingTicker({
                 {formatTime(hoveredEvent.publishedAt)}
               </span>
               {hoveredEvent.url && hoveredEvent.url !== "#" ? (
-                <a
-                  href={hoveredEvent.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`flex items-center gap-1.5 text-[10px] font-mono font-bold px-2.5 py-1 rounded transition-all duration-150 uppercase tracking-wide border ${
-                    isLight
-                      ? "text-cyan-900 bg-cyan-50 border-cyan-300 hover:bg-cyan-100 hover:border-cyan-400 shadow-sm"
-                      : "text-cyan-400 hover:text-white hover:bg-cyan-500 border-cyan-500/30 hover:border-cyan-400"
-                  }`}
-                >
-                  Open full article
-                  <span className="text-[11px]">→</span>
-                </a>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleTranslate}
+                    disabled={
+                      !sourceLang ||
+                      translateStatus === "loading" ||
+                      translateStatus === "done" ||
+                      translateStatus === "english" ||
+                      translateStatus === "unavailable"
+                    }
+                    className={`flex items-center gap-1.5 text-[10px] font-mono font-bold px-2.5 py-1 rounded transition-all duration-150 uppercase tracking-wide border ${
+                      translateStatus === "done"
+                        ? isLight
+                          ? "text-emerald-800 bg-emerald-100 border-emerald-300"
+                          : "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
+                        : translateStatus === "english" ||
+                            translateStatus === "unavailable"
+                          ? isLight
+                            ? "text-slate-400 bg-slate-100 border-slate-200 cursor-not-allowed"
+                            : "text-slate-600 bg-transparent border-brand-border cursor-not-allowed"
+                          : isLight
+                            ? "text-slate-700 bg-slate-100 border-slate-300 hover:bg-cyan-50 hover:border-cyan-400"
+                            : "text-slate-300 bg-transparent border-brand-border hover:text-cyan-400 hover:border-cyan-400"
+                    }`}
+                  >
+                    {translateStatus === "loading" ? (
+                      <SolvingOrb size={12} color={[34, 211, 238]} />
+                    ) : translateStatus === "done" ? (
+                      "Translated"
+                    ) : translateStatus === "english" ? (
+                      "English"
+                    ) : translateStatus === "unavailable" ? (
+                      "Unavailable"
+                    ) : (
+                      "Translate"
+                    )}
+                  </button>
+                  <a
+                    href={hoveredEvent.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex items-center gap-1.5 text-[10px] font-mono font-bold px-2.5 py-1 rounded transition-all duration-150 uppercase tracking-wide border ${
+                      isLight
+                        ? "text-cyan-900 bg-cyan-50 border-cyan-300 hover:bg-cyan-100 hover:border-cyan-400 shadow-sm"
+                        : "text-cyan-400 hover:text-white hover:bg-cyan-500 border-cyan-500/30 hover:border-cyan-400"
+                    }`}
+                  >
+                    Open full article
+                    <span className="text-[11px]">→</span>
+                  </a>
+                </>
               ) : (
                 <span className="text-[9px] font-mono text-slate-500 italic">
                   No link available

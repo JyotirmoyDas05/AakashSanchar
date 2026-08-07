@@ -1,11 +1,11 @@
-# Aegis Sentinel Design System
+# AakashSanchar Design System
 
-Aegis Sentinel is a premium, cinematic OSINT (Open Source Intelligence) dashboard that visualizes global news events using high-contrast geospatial layers.
+AakashSanchar is a premium, cinematic OSINT (Open Source Intelligence) dashboard that visualizes global news events using high-contrast geospatial layers.
 
 ## 1. Design Tokens & Rationale
 
 ### Color System (Deep Space / Cyber Cinematic)
-Unlike the pitch-black and standard red/yellow traffic light palette of the reference app, Aegis Sentinel employs a rich deep-space navy/charcoal base with custom glowing cybernetic categories.
+Unlike the pitch-black and standard red/yellow traffic light palette of the reference app, AakashSanchar employs a rich deep-space navy/charcoal base with custom glowing cybernetic categories.
 
 | Token | CSS Value / Tailwind | Description |
 | :--- | :--- | :--- |
@@ -48,9 +48,9 @@ Unlike the pitch-black and standard red/yellow traffic light palette of the refe
 
 ---
 
-## 2. Rationale: How Aegis Sentinel Differs from World Monitor
+## 2. Rationale: How AakashSanchar Differs from World Monitor
 
-1.  **Unique Layout Composition:** Rather than a floating-card layout on top of a full-screen map, Aegis Sentinel uses a structured grid app shell with a clear vertical control rail on the left, a top-level stats tick bar, and a dedicated, docking collapsible panels setup (right sidebar and bottom feed) that does not clip the map canvas unpredictably.
+1.  **Unique Layout Composition:** Rather than a floating-card layout on top of a full-screen map, AakashSanchar uses a structured grid app shell with a clear vertical control rail on the left, a top-level stats tick bar, and a dedicated, docking collapsible panels setup (right sidebar and bottom feed) that does not clip the map canvas unpredictably.
 2.  **Color Identity:** Shifted from generic pure dark-black/traffic-lights to a military-intelligence inspired Deep Space Blue theme using cyber-cyan, neon-magenta, and safety-orange indicators, reducing eye strain and looking significantly more custom-designed.
-3.  **Visualization Stack:** World Monitor uses full WebGL-based deck.gl / MapLibre. Aegis Sentinel is built with highly optimized React Leaflet, using customized dark tile servers (e.g., CartoDB Dark Matter) and custom canvas-based marker aggregation and heatmap logic to achieve responsive performance without loading heavy multi-megabyte 3D engine binaries.
-4.  **UI Density & Usability:** Aegis Sentinel prioritizes tabular layouts and detailed logging streams, featuring interactive keyboard-driven command navigation suitable for desktop operators.
+3.  **Visualization Stack:** World Monitor uses full WebGL-based deck.gl / MapLibre. AakashSanchar is built with highly optimized React Leaflet, using customized dark tile servers (e.g., CartoDB Dark Matter) and custom canvas-based marker aggregation and heatmap logic to achieve responsive performance without loading heavy multi-megabyte 3D engine binaries.
+4.  **UI Density & Usability:** AakashSanchar prioritizes tabular layouts and detailed logging streams, featuring interactive keyboard-driven command navigation suitable for desktop operators.

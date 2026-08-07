@@ -10,24 +10,42 @@ interface FilterWidgetProps {
   theme?: "dark" | "light";
 }
 
-const CATEGORIES: { id: NewsCategory; label: string; color: string }[] = [
-  { id: "news", label: "News / Geopolitical", color: "bg-cat-news shadow-sm" },
+const CATEGORIES: {
+  id: NewsCategory;
+  label: string;
+  sub: string;
+  color: string;
+}[] = [
+  {
+    id: "news",
+    label: "News / Geopolitical",
+    sub: "Product Launch • Cinema • Sports • Market • Diplomacy • Election • Energy • Rescue",
+    color: "bg-cat-news shadow-sm",
+  },
   {
     id: "conflict",
     label: "Conflict / OSINT",
+    sub: "Armed Clash • Airstrike • Ceasefire Talks",
     color: "bg-cat-conflict glow-conflict",
   },
   {
     id: "disaster",
     label: "Disaster / Seismic",
+    sub: "Flood • Quake • Cyclone • Wildfire",
     color: "bg-cat-disaster glow-disaster",
   },
   {
     id: "health",
     label: "Health / Epidemics",
+    sub: "Outbreak",
     color: "bg-cat-health glow-health",
   },
-  { id: "space", label: "Space / Solar", color: "bg-cat-space glow-space" },
+  {
+    id: "space",
+    label: "Space / Solar",
+    sub: "Space",
+    color: "bg-cat-space glow-space",
+  },
 ];
 
 export default function FilterWidget({
@@ -91,15 +109,25 @@ export default function FilterWidget({
                   : "border-[#222]/40 bg-black/40 hover:bg-[#0d0d0e]"
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                <div className={`h-2 w-2 rounded-full ${c.color}`} />
-                <span
-                  className={`text-xs font-semibold ${
-                    isLight ? "text-slate-800" : "text-slate-300"
-                  }`}
-                >
-                  {labelForCategory(c.id)}
-                </span>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`h-2 w-2 rounded-full ${c.color} shrink-0`} />
+                <div className="flex flex-col min-w-0">
+                  <span
+                    className={`text-xs font-semibold leading-none ${
+                      isLight ? "text-slate-800" : "text-slate-300"
+                    }`}
+                  >
+                    {labelForCategory(c.id)}
+                  </span>
+                  <span
+                    className={`text-[8px] leading-none mt-1 truncate max-w-37.5 ${
+                      isLight ? "text-slate-500" : "text-slate-500"
+                    }`}
+                    title={c.sub}
+                  >
+                    {c.sub}
+                  </span>
+                </div>
               </div>
               <input
                 type="checkbox"

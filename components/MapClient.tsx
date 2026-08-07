@@ -5,8 +5,10 @@ import { useCallback, useEffect, useRef } from "react";
 import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import "leaflet.markercluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
+import { getCartoTileUrl, warnIfMissingKey } from "@/lib/basemaps";
+import { BUCKET_COLOR, bucketForTag } from "@/lib/tagPalette";
 import { toHeatPoints } from "@/lib/toHeatPoints";
-import type { NewsCategory, NewsEvent } from "@/types/news";
+import type { NewsEvent } from "@/types/news";
 
 interface MapClientProps {
   events: NewsEvent[];
@@ -24,23 +26,19 @@ interface MapClientProps {
   onViewportChange: (center: [number, number], zoom: number) => void;
   visualMode: "nodes" | "heat";
   theme?: "dark" | "light";
+  minZoom?: number;
+  maxBounds?: [[number, number], [number, number]];
+  regionId?: string;
 }
 
-const CATEGORY_COLORS: Record<NewsCategory, string> = {
-  news: "#9ca3af",
-  conflict: "#ef4444",
-  disaster: "#f97316",
-  health: "#a855f7",
-  space: "#06b6d4",
-};
-
-// Creates a tactical pulsing SVG marker icon
+// Creates a tactical pulsing SVG marker icon — color now from tag bucket (single-chip model)
 function createTacticalIcon(
-  category: NewsCategory,
+  tagOrCategory: string,
   intensity: number,
   isSelected: boolean,
 ) {
-  const color = CATEGORY_COLORS[category] || "#94a3b8";
+  const bucket = bucketForTag(tagOrCategory);
+  const color = BUCKET_COLOR[bucket] || "#94a3b8";
   const baseSize = isSelected ? 20 : 12;
   const size = baseSize + intensity * 6;
   const glowOpacity = isSelected ? 0.75 : 0.4;
@@ -71,10 +69,14 @@ function createTacticalIcon(
 function MapController({
   center,
   zoom,
+  minZoom,
+  maxBounds,
   isUserInteractingRef,
 }: {
   center: [number, number];
   zoom: number;
+  minZoom: number;
+  maxBounds: [[number, number], [number, number]];
   isUserInteractingRef: React.RefObject<boolean>;
 }) {
   const map = useMap();
@@ -94,14 +96,46 @@ function MapController({
 
     // Only fly if coordinates are significantly different from current viewport
     if (latDiff > 0.05 || lngDiff > 0.05 || zoomDiff > 0.1) {
+      // Relax guardrails for the duration of the fly so World→SA (tightening)
+      // doesn't clamp intermediate zooms/bounds and look like a snap.
+      const prevMinZoom = map.getMinZoom();
+      const _prevBounds = map.getBounds();
+      const targetBounds = L.latLngBounds(maxBounds as L.LatLngBoundsLiteral);
+      const tightening = minZoom > prevMinZoom;
+
+      if (tightening) {
+        map.setMinZoom(Math.min(prevMinZoom, minZoom));
+        // Keep world bounds during the fly so the start (world) isn't considered out-of-bounds.
+        map.setMaxBounds(
+          L.latLngBounds([
+            [-85, -180],
+            [85, 180],
+          ] as L.LatLngBoundsLiteral),
+        );
+      }
+
       map.flyTo(center, zoom, {
-        duration: 1.2,
-        easeLinearity: 0.2,
+        duration: 1.4,
+        easeLinearity: 0.22,
       });
       prevCenterRef.current = center;
       prevZoomRef.current = zoom;
+
+      if (tightening) {
+        const onEnd = () => {
+          map.setMinZoom(minZoom);
+          map.setMaxBounds(targetBounds);
+        };
+        map.once("moveend", onEnd);
+        // Fallback if moveend doesn't fire
+        const timer = setTimeout(onEnd, 1600);
+        return () => {
+          map.off("moveend", onEnd);
+          clearTimeout(timer);
+        };
+      }
     }
-  }, [center, zoom, map, isUserInteractingRef]);
+  }, [center, zoom, minZoom, maxBounds, map, isUserInteractingRef]);
 
   return null;
 }
@@ -133,6 +167,43 @@ function MapResizer() {
     };
   }, [map]);
 
+  return null;
+}
+
+// Locks panning/zoom to the active region when idle. Tightening
+// (World→SA) is handled by MapController so the fly isn't clamped.
+function ViewGuard({
+  minZoom,
+  maxBounds,
+}: {
+  minZoom: number;
+  maxBounds: [[number, number], [number, number]];
+}) {
+  const map = useMap();
+  const prevMinZoomRef = useRef<number>(map.getMinZoom());
+
+  useEffect(() => {
+    const tightening = minZoom > prevMinZoomRef.current;
+    // Let MapController handle the tightening fly — it relaxes bounds/minZoom
+    // for the duration and tightens on moveend. Only handle widening/idle here.
+    if (tightening) {
+      prevMinZoomRef.current = minZoom;
+      return;
+    }
+
+    map.setMinZoom(minZoom);
+    map.setMaxBounds(L.latLngBounds(maxBounds as L.LatLngBoundsLiteral));
+    prevMinZoomRef.current = minZoom;
+    if (
+      !map
+        .getBounds()
+        .intersects(L.latLngBounds(maxBounds as L.LatLngBoundsLiteral))
+    ) {
+      map.panInsideBounds(L.latLngBounds(maxBounds as L.LatLngBoundsLiteral), {
+        animate: true,
+      });
+    }
+  }, [map, minZoom, maxBounds]);
   return null;
 }
 
@@ -352,6 +423,7 @@ function ClusteredMarkers({
   events,
   selectedEventId,
   onEventSelect,
+  onClusterSelect,
 }: {
   events: NewsEvent[];
   selectedEventId: string | null;
@@ -359,12 +431,17 @@ function ClusteredMarkers({
     eventId: string | null,
     screenPos?: { x: number; y: number },
   ) => void;
+  onClusterSelect?: (
+    eventIds: string[],
+    screenPos: { x: number; y: number },
+  ) => void;
 }) {
   const map = useMap();
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
 
   useEffect(() => {
     // Native Leaflet cluster group matching world-monitor specs
+    // Restored spiderfying: zoomToBounds true, window only for small/high-zoom clusters
     const clusterGroup = L.markerClusterGroup({
       showCoverageOnHover: false,
       zoomToBoundsOnClick: true,
@@ -427,13 +504,47 @@ function ClusteredMarkers({
     clusterGroupRef.current = clusterGroup;
     map.addLayer(clusterGroup);
 
+    if (onClusterSelect) {
+      const handler = (e: unknown) => {
+        const ce = e as { layer: L.MarkerCluster; latlng: L.LatLng };
+        const childCount = ce.layer.getChildCount();
+        const currentZoom = map.getZoom();
+        // Only open RegionWindow for small or high-zoom clusters (search-filtered Nepal Floods etc.)
+        // Big diverse clusters at low zoom just zoom/spiderfy as before — fixes "every cluster opens window"
+        if (currentZoom < 7 && childCount > 10) return;
+        const markers = ce.layer.getAllChildMarkers() as unknown as Array<
+          L.Marker & { options: { eventId?: string } }
+        >;
+        const ids = markers
+          .map((m) => (m.options as unknown as { eventId?: string }).eventId)
+          .filter(Boolean) as string[];
+        const containerPoint = map.latLngToContainerPoint(ce.latlng);
+        const container = map.getContainer();
+        const rect = container.getBoundingClientRect();
+        onClusterSelect(ids, {
+          x: rect.left + containerPoint.x,
+          y: rect.top + containerPoint.y,
+        });
+      };
+      // biome-ignore lint/suspicious/noExplicitAny: leaflet typings for clusterclick
+      (clusterGroup as any).on("clusterclick", handler);
+      return () => {
+        // biome-ignore lint/suspicious/noExplicitAny: leaflet typings
+        (clusterGroup as any).off("clusterclick", handler);
+        if (clusterGroupRef.current) {
+          map.removeLayer(clusterGroupRef.current);
+          clusterGroupRef.current = null;
+        }
+      };
+    }
+
     return () => {
       if (clusterGroupRef.current) {
         map.removeLayer(clusterGroupRef.current);
         clusterGroupRef.current = null;
       }
     };
-  }, [map]);
+  }, [map, onClusterSelect]);
 
   // Sync Leaflet markers to events / selected marker changes
   useEffect(() => {
@@ -444,9 +555,11 @@ function ClusteredMarkers({
 
     const markers = events.map((ev) => {
       const isSelected = ev.id === selectedEventId;
+      const tagKey = ev.tag ?? ev.category;
+      const bucket = bucketForTag(tagKey);
       const marker = L.marker([ev.lat, ev.lng], {
-        icon: createTacticalIcon(ev.category, ev.intensity, isSelected),
-        category: ev.category,
+        icon: createTacticalIcon(tagKey, ev.intensity, isSelected),
+        category: bucket,
         eventId: ev.id,
         // biome-ignore lint/suspicious/noExplicitAny: leaflet marker options does not include custom attributes
       } as any);
@@ -487,7 +600,38 @@ function ClusteredMarkers({
     });
 
     clusterGroup.addLayers(markers);
+
+    // MarkerCluster computes clusters from the map's current zoom/bounds.
+    // On a region toggle we swap both the marker set *and* fly the viewport
+    // (world zoom 2 → south-asia 5.5 over 1.2s). If we add the new markers
+    // while the fly is still in progress the cluster math runs against the
+    // old zoom and we end up with the sparse-white-marker state from the bug
+    // report. Refresh after the animation (and once on next frame) so the
+    // clusters recompute at the final viewport.
+    let raf = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    raf = requestAnimationFrame(() => clusterGroup.refreshClusters());
+    timer = setTimeout(() => clusterGroup.refreshClusters(), 1350);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      if (timer) clearTimeout(timer);
+    };
   }, [events, selectedEventId, onEventSelect, map]);
+
+  // Keep clusters in sync with any programmatic viewport change (flyTo,
+  // ViewGuard's setMinZoom/setMaxBounds). Without this a pan/zoom that
+  // finishes after addLayers won't re-cluster until the next user interaction.
+  useEffect(() => {
+    const group = clusterGroupRef.current;
+    if (!group) return;
+    const refresh = () => requestAnimationFrame(() => group.refreshClusters());
+    map.on("moveend", refresh);
+    map.on("zoomend", refresh);
+    return () => {
+      map.off("moveend", refresh);
+      map.off("zoomend", refresh);
+    };
+  }, [map]);
 
   return null;
 }
@@ -496,14 +640,24 @@ export default function MapClient({
   events,
   selectedEventId,
   onEventSelect,
-  onClusterSelect: _onClusterSelect,
+  onClusterSelect,
   center,
   zoom,
   onViewportChange,
   visualMode,
   theme = "dark",
+  minZoom = 2,
+  maxBounds = [
+    [-85, -180],
+    [85, 180],
+  ],
+  regionId,
 }: MapClientProps) {
   const isUserInteractingRef = useRef(false);
+
+  useEffect(() => {
+    warnIfMissingKey();
+  }, []);
 
   return (
     <div className="relative h-full w-full">
@@ -513,32 +667,30 @@ export default function MapClient({
         className="h-full w-full"
         scrollWheelZoom={true}
         zoomControl={false}
-        minZoom={2}
-        maxBounds={[
-          [-85, -180],
-          [85, 180],
-        ]}
+        minZoom={minZoom}
+        maxBounds={maxBounds}
         maxBoundsViscosity={1.0}
         worldCopyJump={false}
         attributionControl={false}
       >
-        {/* CartoDB Dark / Light basemap */}
+        {/* CartoDB Dark / Light basemap — key injected via NEXT_PUBLIC_CARTO_API_KEY */}
         <TileLayer
           attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url={
-            theme === "light"
-              ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-              : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          }
+          url={getCartoTileUrl(theme === "light" ? "light" : "dark")}
           maxZoom={20}
         />
 
-        {/* Fly to Controller */}
+        {/* Fly to Controller — handles smooth World↔SA with relaxed guardrails */}
         <MapController
           center={center}
           zoom={zoom}
+          minZoom={minZoom}
+          maxBounds={maxBounds}
           isUserInteractingRef={isUserInteractingRef}
         />
+
+        {/* Live region guardrails — keeps zoom/pan locked to active region */}
+        <ViewGuard minZoom={minZoom} maxBounds={maxBounds} />
 
         {/* Map Container Resize Observer */}
         <MapResizer />
@@ -558,17 +710,23 @@ export default function MapClient({
           />
         )}
 
-        {/* Tactical Nodes Mode */}
+        {/* Tactical Nodes Mode — keyed by region so the markerClusterGroup is
+            recreated at the target zoom instead of being reused mid-fly, which
+            otherwise leaves the sparse-white-marker state until next interaction. */}
         {visualMode === "nodes" && (
           <ClusteredMarkers
+            key={regionId ?? "default"}
             events={events}
             selectedEventId={selectedEventId}
             onEventSelect={onEventSelect}
+            onClusterSelect={onClusterSelect}
           />
         )}
 
         {/* Hotspot Heatmap Mode */}
-        {visualMode === "heat" && <HeatLayer events={events} />}
+        {visualMode === "heat" && (
+          <HeatLayer key={regionId ?? "heat"} events={events} />
+        )}
       </MapContainer>
 
       {/* World-Monitor Geographic HUD Grid Overlay (Barely visible whisper grid) */}

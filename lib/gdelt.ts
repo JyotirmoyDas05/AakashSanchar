@@ -5,11 +5,12 @@
  */
 
 import { extractTitleFromUrl } from "@/lib/articleTitle";
+import { deriveTag } from "@/lib/deriveTags";
 import type { NewsCategory, NewsEvent } from "@/types/news";
 
 // ── CAMEO event code → category mapping ──
 // https://parusanalytics.com/eventdata/data.dir/cameo.html
-function cameoToCategory(code: string): NewsCategory {
+function _cameoToCategory(code: string): NewsCategory {
   const root = code.substring(0, 2);
   // 18x = ASSAULT, 19x = FIGHT, 20x = MASS VIOLENCE
   if (root === "18" || root === "19" || root === "20") return "conflict";
@@ -39,7 +40,7 @@ function goldsteinToIntensity(goldstein: number): number {
 }
 
 // ── Keyword-based category refinement from title/source ──
-function refineCategory(
+function _refineCategory(
   title: string,
   source: string,
   baseCategory: NewsCategory,
@@ -300,10 +301,11 @@ function buildTitle(raw: GdeltRawEvent): string {
 
 /** Convert raw GDELT event to our NewsEvent format */
 function rawToNewsEvent(raw: GdeltRawEvent): NewsEvent {
-  const baseCategory = cameoToCategory(raw.eventCode);
   const title = extractTitleFromUrl(raw.sourceUrl) || buildTitle(raw);
-  const category = refineCategory(title, raw.sourceUrl, baseCategory);
   const domain = extractDomain(raw.sourceUrl);
+  const derived = deriveTag(title, "", domain, raw.avgTone, raw.goldstein);
+  const category = derived.bucket;
+  const tag = derived.tag;
 
   // Tone-based sentiment label
   const toneLabel =
@@ -325,6 +327,7 @@ function rawToNewsEvent(raw: GdeltRawEvent): NewsEvent {
     description: `${toneLabel} coverage across ${raw.numMentions} source${raw.numMentions !== 1 ? "s" : ""}. Goldstein stability score: ${raw.goldstein.toFixed(1)}. Reported by ${domain}.`,
     source: domain,
     category,
+    tag,
     publishedAt,
     locationName: toTitleCase(raw.locationName),
     lat: raw.lat,
@@ -406,13 +409,14 @@ export function parseGdeltEventsCsv(csvText: string): NewsEvent[] {
 /** Fetch GDELT DOC API articles and convert to NewsEvent[] */
 export function parseGdeltArticles(articlesJson: GdeltArticle[]): NewsEvent[] {
   return articlesJson.map((art, i) => {
-    const category = refineCategory(art.title, art.domain, "news");
+    const derived = deriveTag(art.title, "", art.domain);
     return {
       id: `gdelt-art-${i}-${Date.now()}`,
       title: art.title,
       description: `Published by ${art.domain} (${art.sourcecountry || "Unknown"})`,
       source: art.domain,
-      category,
+      category: derived.bucket,
+      tag: derived.tag,
       publishedAt: gdeltSeenDateToISO(art.seendate),
       locationName: art.sourcecountry || "Global",
       // DOC API doesn't include coords, set to 0 — filter out in caller

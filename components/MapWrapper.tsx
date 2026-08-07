@@ -32,6 +32,9 @@ interface MapWrapperProps {
   onViewportChange: (center: [number, number], zoom: number) => void;
   visualMode: "nodes" | "heat";
   theme?: "dark" | "light";
+  minZoom?: number;
+  maxBounds?: [[number, number], [number, number]];
+  regionId?: string;
 }
 
 export default function MapWrapper(props: MapWrapperProps) {
