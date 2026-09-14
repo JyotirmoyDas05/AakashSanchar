@@ -22,6 +22,7 @@ interface CommandPaletteProps {
     results: NewsEvent[],
     bounds: SpatialBounds | null,
     primaryCountry: string | null,
+    centroid: [number, number] | null,
   ) => void;
   theme?: "dark" | "light";
 }
@@ -85,6 +86,7 @@ type FlatItem =
       events: NewsEvent[];
       bounds: SpatialBounds | null;
       country: string | null;
+      centroid: [number, number] | null;
     }
   | { type: "event"; data: NewsEvent };
 
@@ -164,6 +166,7 @@ export default function CommandPalette({
         events: structuredResult.events,
         bounds: structuredResult.globalBounds,
         country: structuredResult.primaryCountry,
+        centroid: structuredResult.primaryCentroid,
       });
     }
     for (const ev of structuredResult.events) {
@@ -200,33 +203,45 @@ export default function CommandPalette({
     (item: FlatItem) => {
       if (item.type === "location") {
         if (onGeneralSelect) {
+          const wanted = new Set(item.data.eventIds);
           const matched = categoryFilteredEvents.filter((e) =>
-            item.data.eventIds.includes(e.id),
+            wanted.has(e.id),
           );
           onGeneralSelect(
             item.data.name,
             matched.length ? matched : categoryFilteredEvents,
             item.data.bounds,
             item.data.name,
+            [item.data.lat, item.data.lng],
           );
         }
         onClose();
       } else if (item.type === "topic") {
         if (onGeneralSelect) {
+          const wanted = new Set(item.data.eventIds);
           const matched = categoryFilteredEvents.filter((e) =>
-            item.data.eventIds.includes(e.id),
+            wanted.has(e.id),
           );
           onGeneralSelect(
             item.data.name,
             matched.length ? matched : categoryFilteredEvents,
             item.data.bounds,
             null,
+            item.data.lat != null && item.data.lng != null
+              ? [item.data.lat, item.data.lng]
+              : null,
           );
         }
         onClose();
       } else if (item.type === "global") {
         if (onGeneralSelect) {
-          onGeneralSelect(item.query, item.events, item.bounds, item.country);
+          onGeneralSelect(
+            item.query,
+            item.events,
+            item.bounds,
+            item.country,
+            item.centroid,
+          );
         }
         onClose();
       } else if (item.type === "event") {
@@ -678,7 +693,10 @@ export default function CommandPalette({
                                   : "text-slate-500"
                               }`}
                             >
-                              {ev.lat.toFixed(2)}, {ev.lng.toFixed(2)}
+                              {Number.isFinite(ev.lat) &&
+                              Number.isFinite(ev.lng)
+                                ? `${ev.lat.toFixed(2)}, ${ev.lng.toFixed(2)}`
+                                : "NO FIX"}
                             </span>
                           </div>
                           <h4

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import ResizeHandles from "./ResizeHandles";
 
 interface FloatingWindowProps {
   title: string;
@@ -42,12 +43,6 @@ export default function FloatingWindow({
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const startPos = useRef({ x: 0, y: 0 });
-
-  const isResizing = useRef(false);
-  const resizeDirection = useRef<string>("");
-  const resizeStart = useRef({ x: 0, y: 0 });
-  const startSize = useRef({ width: 0, height: 0 });
-  const resizeStartPos = useRef({ x: 0, y: 0 });
 
   // Dragging handlers
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -90,79 +85,12 @@ export default function FloatingWindow({
     document.addEventListener("mouseup", handleMouseUp);
   };
 
-  // Resizing handlers
-  const handleResizeMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing.current) return;
-    const dx = e.clientX - resizeStart.current.x;
-    const dy = e.clientY - resizeStart.current.y;
-
-    const minW = 280;
-    const minH = 200;
-
-    let newW = startSize.current.width;
-    let newH = startSize.current.height;
-    let newX = resizeStartPos.current.x;
-    let newY = resizeStartPos.current.y;
-
-    const dir = resizeDirection.current;
-
-    if (dir.includes("e")) {
-      newW = Math.max(minW, startSize.current.width + dx);
-    } else if (dir.includes("w")) {
-      const possibleW = startSize.current.width - dx;
-      newW = Math.max(minW, possibleW);
-      newX = resizeStartPos.current.x + (startSize.current.width - newW);
-    }
-
-    if (dir.includes("s")) {
-      newH = Math.max(minH, startSize.current.height + dy);
-    } else if (dir.includes("n")) {
-      const possibleH = startSize.current.height - dy;
-      newH = Math.max(minH, possibleH);
-      newY = resizeStartPos.current.y + (startSize.current.height - newH);
-    }
-
-    setSize({ width: newW, height: newH });
-    setPosition({ x: newX, y: newY });
-  }, []);
-
-  const handleResizeMouseUp = useCallback(() => {
-    if (isResizing.current) {
-      isResizing.current = false;
-      setIsInteracting(false);
-    }
-    document.removeEventListener("mousemove", handleResizeMouseMove);
-    document.removeEventListener("mouseup", handleResizeMouseUp);
-  }, [handleResizeMouseMove]);
-
-  const handleResizeMouseDown = (e: React.MouseEvent, direction: string) => {
-    if (isMaximized) return;
-    e.preventDefault();
-    e.stopPropagation();
-    isResizing.current = true;
-    setIsInteracting(true);
-    resizeDirection.current = direction;
-    resizeStart.current = { x: e.clientX, y: e.clientY };
-    startSize.current = { width: size.width, height: size.height };
-    resizeStartPos.current = { x: position.x, y: position.y };
-
-    document.addEventListener("mousemove", handleResizeMouseMove);
-    document.addEventListener("mouseup", handleResizeMouseUp);
-  };
-
   useEffect(() => {
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
-      document.removeEventListener("mousemove", handleResizeMouseMove);
-      document.removeEventListener("mouseup", handleResizeMouseUp);
     };
-  }, [
-    handleMouseMove,
-    handleMouseUp,
-    handleResizeMouseMove,
-    handleResizeMouseUp,
-  ]);
+  }, [handleMouseMove, handleMouseUp]);
 
   return (
     <div
@@ -273,53 +201,14 @@ export default function FloatingWindow({
         {children}
       </div>
 
-      {/* Resize handles (only show if not maximized) */}
       {!isMaximized && (
-        <>
-          {/* Edges */}
-          <div
-            data-resize-handle="true"
-            onMouseDown={(e) => handleResizeMouseDown(e, "n")}
-            className="absolute top-0 left-3 right-3 h-2 cursor-n-resize z-30"
-          />
-          <div
-            data-resize-handle="true"
-            onMouseDown={(e) => handleResizeMouseDown(e, "s")}
-            className="absolute bottom-0 left-3 right-3 h-2 cursor-s-resize z-30"
-          />
-          <div
-            data-resize-handle="true"
-            onMouseDown={(e) => handleResizeMouseDown(e, "w")}
-            className="absolute top-3 bottom-3 left-0 w-2 cursor-w-resize z-30"
-          />
-          <div
-            data-resize-handle="true"
-            onMouseDown={(e) => handleResizeMouseDown(e, "e")}
-            className="absolute top-3 bottom-3 right-0 w-2 cursor-e-resize z-30"
-          />
-
-          {/* Corners */}
-          <div
-            data-resize-handle="true"
-            onMouseDown={(e) => handleResizeMouseDown(e, "nw")}
-            className="absolute top-0 left-0 w-3.5 h-3.5 cursor-nw-resize z-40"
-          />
-          <div
-            data-resize-handle="true"
-            onMouseDown={(e) => handleResizeMouseDown(e, "ne")}
-            className="absolute top-0 right-0 w-3.5 h-3.5 cursor-ne-resize z-40"
-          />
-          <div
-            data-resize-handle="true"
-            onMouseDown={(e) => handleResizeMouseDown(e, "sw")}
-            className="absolute bottom-0 left-0 w-3.5 h-3.5 cursor-sw-resize z-40"
-          />
-          <div
-            data-resize-handle="true"
-            onMouseDown={(e) => handleResizeMouseDown(e, "se")}
-            className="absolute bottom-0 right-0 w-3.5 h-3.5 cursor-se-resize z-40"
-          />
-        </>
+        <ResizeHandles
+          size={size}
+          position={position}
+          setSize={setSize}
+          setPosition={setPosition}
+          onInteractingChange={setIsInteracting}
+        />
       )}
     </div>
   );

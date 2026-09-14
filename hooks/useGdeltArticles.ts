@@ -6,6 +6,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { deriveTag } from "@/lib/deriveTags";
+// Type-only: erased at compile time, so nothing server-side is bundled.
+import type { LocationDigest } from "@/lib/locationDigest";
 import type { NewsCategory, NewsEvent } from "@/types/news";
 
 interface RssArticle {
@@ -17,6 +19,10 @@ interface RssArticle {
   language: string;
   sourcecountry: string;
   imageUrl?: string;
+  /** Resolved server-side by lib/geocode.ts; absent when no place was found. */
+  lat?: number;
+  lng?: number;
+  locationName?: string;
 }
 
 // Shown immediately on page load — replaced once RSS feeds respond
@@ -121,244 +127,18 @@ function _refineCategory(title: string, domain: string): NewsCategory {
   return "news";
 }
 
-const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
-  // South Asia
-  India: [20.5937, 78.9629],
-  Pakistan: [30.3753, 69.3451],
-  Bangladesh: [23.685, 90.3563],
-  "Sri Lanka": [7.8731, 80.7718],
-  Nepal: [28.3949, 84.124],
-  Myanmar: [21.9162, 95.9559],
-  Bhutan: [27.5142, 90.4336],
-  Maldives: [3.2028, 73.2207],
-  Afghanistan: [33.9391, 67.71],
-  // Middle East & North Africa
-  Iran: [32.4279, 53.688],
-  Israel: [31.0461, 34.8516],
-  Palestine: [31.9522, 35.2332],
-  "Saudi Arabia": [23.8859, 45.0792],
-  UAE: [23.4241, 53.8478],
-  Qatar: [25.3548, 51.1839],
-  Yemen: [15.5527, 48.5164],
-  Syria: [34.8021, 38.9968],
-  Lebanon: [33.8547, 35.8623],
-  Iraq: [33.2232, 43.6793],
-  Turkey: [38.9637, 35.2433],
-  Egypt: [26.8206, 30.8025],
-  // Europe & Americas
-  Ukraine: [48.3794, 31.1656],
-  Russia: [61.524, 105.3188],
-  "United Kingdom": [55.3781, -3.436],
-  "United States": [37.0902, -95.7129],
-  Germany: [51.1657, 10.4515],
-  France: [46.2276, 2.2137],
-  Switzerland: [46.8182, 8.2275],
-  Canada: [56.1304, -106.3468],
-  Venezuela: [6.4238, -66.5897],
-  // Asia-Pacific & Africa
-  China: [35.8617, 104.1954],
-  Taiwan: [23.6978, 120.9605],
-  Japan: [36.2048, 138.2529],
-  "South Korea": [35.9078, 127.7669],
-  Thailand: [15.87, 100.9925],
-  Sudan: [12.8628, 30.2176],
-  Somalia: [5.1521, 46.1996],
-};
-
-const COUNTRY_KEYWORD_MAP: Array<{ keywords: string[]; country: string }> = [
-  {
-    keywords: [
-      "iran",
-      "tehran",
-      "iranian",
-      "persian",
-      "irgc",
-      "khamenei",
-      "isfahan",
-      "hormuz",
-    ],
-    country: "Iran",
-  },
-  {
-    keywords: [
-      "israel",
-      "tel aviv",
-      "jerusalem",
-      "idf",
-      "netanyahu",
-      "gaza",
-      "haifa",
-      "mossad",
-      "israeli",
-    ],
-    country: "Israel",
-  },
-  {
-    keywords: [
-      "ukraine",
-      "kyiv",
-      "kharkiv",
-      "odessa",
-      "zelensky",
-      "donbas",
-      "crimea",
-      "zaporizhzhia",
-      "ukrainian",
-    ],
-    country: "Ukraine",
-  },
-  {
-    keywords: [
-      "russia",
-      "moscow",
-      "kremlin",
-      "putin",
-      "st petersburg",
-      "russian",
-      "kursk",
-      "belgorod",
-    ],
-    country: "Russia",
-  },
-  {
-    keywords: [
-      "china",
-      "beijing",
-      "shanghai",
-      "taiwan",
-      "taipei",
-      "xi jinping",
-      "chinese",
-    ],
-    country: "China",
-  },
-  { keywords: ["taiwan", "taipei", "tsmc"], country: "Taiwan" },
-  {
-    keywords: ["yemen", "houthi", "red sea", "sanaa", "aden"],
-    country: "Yemen",
-  },
-  {
-    keywords: ["lebanon", "beirut", "hezbollah", "lebanese"],
-    country: "Lebanon",
-  },
-  { keywords: ["syria", "damascus", "aleppo", "syrian"], country: "Syria" },
-  { keywords: ["iraq", "baghdad", "erbil", "basra", "iraqi"], country: "Iraq" },
-  {
-    keywords: ["saudi", "riyadh", "jeddah", "saudi arabia"],
-    country: "Saudi Arabia",
-  },
-  { keywords: ["uae", "dubai", "abu dhabi", "emirates"], country: "UAE" },
-  {
-    keywords: ["turkey", "ankara", "istanbul", "erdogan", "turkiye"],
-    country: "Turkey",
-  },
-  { keywords: ["egypt", "cairo", "suez"], country: "Egypt" },
-  { keywords: ["sudan", "khartoum", "darfur"], country: "Sudan" },
-  { keywords: ["somalia", "mogadishu"], country: "Somalia" },
-  { keywords: ["japan", "tokyo", "osaka", "japanese"], country: "Japan" },
-  {
-    keywords: [
-      "united states",
-      "washington",
-      "pentagon",
-      "biden",
-      "trump",
-      "white house",
-      "california",
-    ],
-    country: "United States",
-  },
-  {
-    keywords: ["united kingdom", "london", "british", "britain"],
-    country: "United Kingdom",
-  },
-  { keywords: ["germany", "berlin", "german"], country: "Germany" },
-  { keywords: ["france", "paris", "french"], country: "France" },
-  {
-    keywords: [
-      "nepal",
-      "kathmandu",
-      "pokhara",
-      "bhotekoshi",
-      "nepali",
-      "nepalese",
-      "trishuli",
-    ],
-    country: "Nepal",
-  },
-  {
-    keywords: ["sri lanka", "colombo", "kandy", "galle", "jaffna", "srilankan"],
-    country: "Sri Lanka",
-  },
-  {
-    keywords: ["bangladesh", "dhaka", "chittagong", "bangladeshi"],
-    country: "Bangladesh",
-  },
-  {
-    keywords: [
-      "pakistan",
-      "karachi",
-      "lahore",
-      "islamabad",
-      "rawalpindi",
-      "peshawar",
-      "balochistan",
-    ],
-    country: "Pakistan",
-  },
-  {
-    keywords: [
-      "india",
-      "delhi",
-      "mumbai",
-      "modi",
-      "bengaluru",
-      "kolkata",
-      "chennai",
-      "kashmir",
-      "indian",
-    ],
-    country: "India",
-  },
-  { keywords: ["myanmar", "burma", "yangon", "mandalay"], country: "Myanmar" },
-];
-
-function inferCountry(
-  title: string,
-  description: string,
-  fallback: string,
-): string {
-  const hay = `${title} ${description}`.toLowerCase();
-  for (const { keywords, country } of COUNTRY_KEYWORD_MAP) {
-    if (keywords.some((kw) => hay.includes(kw))) {
-      return country;
-    }
-  }
-  return fallback || "Global";
-}
-
-function countryToLatLng(country: string, index: number): [number, number] {
-  const base = COUNTRY_CENTROIDS[country] || COUNTRY_CENTROIDS.India;
-  // Deterministic jitter per article so markers spread within the country instead of stacking
-  const angle = index * 2.39996; // golden angle
-  const radius = 0.9 * Math.sqrt((index % 12) + 1); // degrees, spreads ~100km
-  const dLat = radius * Math.cos(angle);
-  const dLng =
-    (radius * Math.sin(angle)) / Math.cos((base[0] * Math.PI) / 180 || 1);
-  return [
-    Number.parseFloat((base[0] + dLat).toFixed(4)),
-    Number.parseFloat((base[1] + dLng).toFixed(4)),
-  ];
-}
+// Coordinates now arrive resolved from /api/gdelt/articles (see lib/geocode.ts).
+// The old country-centroid table plus golden-angle jitter that used to live
+// here fabricated positions: it threw Bangladeshi wires across the border into
+// Assam and dropped every unrecognised country onto India's centroid.
 
 function rssToNewsEvent(art: RssArticle, index: number): NewsEvent {
-  const inferred = inferCountry(
-    art.title,
-    art.description,
-    art.sourcecountry || "Global",
-  );
   const derived = deriveTag(art.title, art.description, art.domain);
-  const [lat, lng] = countryToLatLng(inferred, index);
+  // NaN when the server could not resolve a place. Callers that draw markers
+  // already gate on Number.isFinite, so an unplaceable article stays in the
+  // wire feed and never appears on the map at a made-up location.
+  const lat = art.lat ?? Number.NaN;
+  const lng = art.lng ?? Number.NaN;
   return {
     id: `rss-${index}-${art.url.slice(-10)}`,
     title: art.title,
@@ -367,7 +147,7 @@ function rssToNewsEvent(art: RssArticle, index: number): NewsEvent {
     category: derived.bucket,
     tag: derived.tag,
     publishedAt: art.pubDate,
-    locationName: inferred,
+    locationName: art.locationName ?? "Global",
     lat,
     lng,
     intensity: 0.6,
@@ -378,12 +158,17 @@ function rssToNewsEvent(art: RssArticle, index: number): NewsEvent {
 
 interface UseGdeltArticlesResult {
   articles: NewsEvent[];
+  /** Precomputed per-location brief + analysis, keyed by resolved place. */
+  digests: Map<string, LocationDigest>;
   isLoading: boolean;
   isError: boolean;
 }
 
 export function useGdeltArticles(region = "world"): UseGdeltArticlesResult {
   const [articles, setArticles] = useState<NewsEvent[]>(INITIAL_MOCK);
+  const [digests, setDigests] = useState<Map<string, LocationDigest>>(
+    () => new Map(),
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const hasRealData = useRef(false);
@@ -399,6 +184,10 @@ export function useGdeltArticles(region = "world"): UseGdeltArticlesResult {
       if (!res.ok) throw new Error(`Articles API returned ${res.status}`);
       const data = await res.json();
       const rawArticles: RssArticle[] = data.articles || [];
+      const rawDigests: LocationDigest[] = data.locations || [];
+      if (rawDigests.length) {
+        setDigests(new Map(rawDigests.map((d) => [d.locationName, d])));
+      }
 
       const seen = new Set<string>();
       const parsed = rawArticles
@@ -442,5 +231,5 @@ export function useGdeltArticles(region = "world"): UseGdeltArticlesResult {
     };
   }, [fetchArticles]);
 
-  return { articles, isLoading, isError };
+  return { articles, digests, isLoading, isError };
 }

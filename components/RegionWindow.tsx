@@ -6,9 +6,12 @@ import {
   type StrategicAnalysisPillars,
   synthesizeRegionIntelligence,
 } from "@/lib/intelligenceSynthesizer";
+import type { LocationDigest } from "@/lib/locationDigest";
+import { usableTimes } from "@/lib/regionAnalysis";
 import { calculateCoreSpatialCluster, searchEvents } from "@/lib/search";
 import { synthesizeStrategicAnalysisWithLLM } from "@/lib/webLLM";
 import type { NewsEvent } from "@/types/news";
+import ResizeHandles from "./ResizeHandles";
 import { SolvingOrb } from "./SolvingOrb";
 
 const RealMiniMap = dynamic(() => import("@/components/RealMiniMap"), {
@@ -18,6 +21,12 @@ const RealMiniMap = dynamic(() => import("@/components/RealMiniMap"), {
 interface RegionWindowProps {
   events: NewsEvent[];
   locationName: string;
+  /**
+   * Precomputed server-side brief + analysis for this place. Present when the
+   * whole region resolves to one location; null otherwise, in which case the
+   * on-device synthesis below is used instead.
+   */
+  digest?: LocationDigest | null;
   query?: string;
   onClose: () => void;
   zIndex?: number;
@@ -189,6 +198,7 @@ function ImageCarousel({
 export default function RegionWindow({
   events,
   locationName,
+  digest = null,
   query,
   onClose,
   zIndex = 1050,
@@ -199,6 +209,13 @@ export default function RegionWindow({
 }: RegionWindowProps) {
   const isLight = theme === "light";
   const [position, setPosition] = useState(defaultPosition);
+  const [size, setSize] = useState(() => ({
+    width: 350,
+    height:
+      typeof window === "undefined"
+        ? 560
+        : Math.min(560, Math.max(260, window.innerHeight - 160)),
+  }));
   const [isMaximized, setIsMaximized] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
@@ -230,7 +247,10 @@ export default function RegionWindow({
   );
   const dotColor = LEVEL_DOT[level];
 
-  const summary = synthesized.summary;
+  // Precomputed server-side text wins: it was written once during the feed
+  // refresh from the full set of dispatches for this place, so it is both
+  // cheaper and better-grounded than re-deriving it on every panel open.
+  const summary = digest?.summary ?? synthesized.summary;
   const analysisPillars = synthesized.analysis;
   const keyEvents = synthesized.keyEvents;
 
@@ -324,48 +344,47 @@ export default function RegionWindow({
     return Math.round(avg * 90 + 10);
   }, [displayEvents]);
 
+  // usableTimes drops feed timestamps that are epoch-zero or far-future; one of
+  // those was rendering "Updated 2964d ago" on a panel whose newest dispatch
+  // was two hours old.
+  const eventTimes = useMemo(() => usableTimes(displayEvents), [displayEvents]);
+
   const firstSeen = useMemo(() => {
-    if (!displayEvents.length) return "unknown";
-    const oldest = displayEvents.reduce((a, b) =>
-      new Date(a.publishedAt) < new Date(b.publishedAt) ? a : b,
-    );
-    const h = Math.floor(
-      (Date.now() - new Date(oldest.publishedAt).getTime()) / 3_600_000,
-    );
+    const oldest = eventTimes[0];
+    if (!oldest) return "unknown";
+    const h = Math.floor((Date.now() - oldest) / 3_600_000);
     if (h < 1) return "< 1h ago";
     if (h === 1) return "1h ago";
     if (h < 24) return `${h}h ago`;
-    const d = Math.floor(h / 24);
-    return `${d}d ago`;
-  }, [displayEvents]);
+    return `${Math.floor(h / 24)}d ago`;
+  }, [eventTimes]);
 
   const expiresIn = useMemo(() => {
-    if (!displayEvents.length) return "48h";
-    const newest = displayEvents.reduce((a, b) =>
-      new Date(a.publishedAt) > new Date(b.publishedAt) ? a : b,
-    );
-    const ageMs = Date.now() - new Date(newest.publishedAt).getTime();
-    const remainMs = 48 * 3_600_000 - ageMs;
+    const newest = eventTimes[eventTimes.length - 1];
+    if (!newest) return "48h";
+    const remainMs = 48 * 3_600_000 - (Date.now() - newest);
     if (remainMs <= 0) return "< 1h";
-    const h = Math.ceil(remainMs / 3_600_000);
-    return `${h}h`;
-  }, [displayEvents]);
+    return `${Math.ceil(remainMs / 3_600_000)}h`;
+  }, [eventTimes]);
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging.current) return;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    setPosition({
-      x: Math.max(
-        10,
-        Math.min(window.innerWidth - 350, startPos.current.x + dx),
-      ),
-      y: Math.max(
-        10,
-        Math.min(window.innerHeight - 100, startPos.current.y + dy),
-      ),
-    });
-  }, []);
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      setPosition({
+        x: Math.max(
+          10,
+          Math.min(window.innerWidth - size.width, startPos.current.x + dx),
+        ),
+        y: Math.max(
+          10,
+          Math.min(window.innerHeight - 100, startPos.current.y + dy),
+        ),
+      });
+    },
+    [size.width],
+  );
 
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;
@@ -407,7 +426,8 @@ export default function RegionWindow({
         position: "fixed",
         left: `${position.x}px`,
         top: `${position.y}px`,
-        width: "350px",
+        width: `${size.width}px`,
+        height: isMinimized ? undefined : `${size.height}px`,
         zIndex,
       };
 
@@ -415,7 +435,7 @@ export default function RegionWindow({
     <div
       onMouseDownCapture={onFocus}
       style={wrapStyle}
-      className={`rounded-lg border font-mono select-none flex flex-col ${
+      className={`rounded-lg border font-mono select-none flex flex-col overflow-hidden ${
         isLight
           ? "border-slate-300 bg-white text-slate-900 shadow-xl"
           : "border-[#222] bg-brand-bg/95 text-slate-200 shadow-2xl backdrop-blur-md"
@@ -545,7 +565,7 @@ export default function RegionWindow({
       </div>
 
       {!isMinimized && (
-        <div className="flex-1 overflow-y-auto max-h-[calc(100vh-140px)] select-text">
+        <div className="flex-1 min-h-0 overflow-y-auto select-text">
           {/* Real MiniMap or Carousel banner */}
           <div className="relative">
             <ImageCarousel
@@ -773,46 +793,62 @@ export default function RegionWindow({
                 </div>
               )}
 
-            {/* Assessment Content: 3 Strategic Pillars */}
+            {/* Assessment pillars — a pillar the dispatches cannot support
+                comes back null and is dropped rather than padded with filler. */}
             <div className="space-y-2 mb-3 text-[10.5px] leading-relaxed">
-              <div
-                className={`p-2.5 rounded border ${
-                  isLight
-                    ? "bg-slate-50 border-slate-200 text-slate-800"
-                    : "bg-[#0b101c]/80 border-brand-border/60 text-slate-300"
-                }`}
-              >
-                <span className="font-bold text-[9px] uppercase tracking-wider block mb-0.5 text-orange-500">
-                  • Impact & Infrastructure
-                </span>
-                {effectivePillars.impactAssessment}
-              </div>
-
-              <div
-                className={`p-2.5 rounded border ${
-                  isLight
-                    ? "bg-slate-50 border-slate-200 text-slate-800"
-                    : "bg-[#0b101c]/80 border-brand-border/60 text-slate-300"
-                }`}
-              >
-                <span className="font-bold text-[9px] uppercase tracking-wider block mb-0.5 text-emerald-500">
-                  • Operations & Response
-                </span>
-                {effectivePillars.operationalDynamics}
-              </div>
-
-              <div
-                className={`p-2.5 rounded border ${
-                  isLight
-                    ? "bg-slate-50 border-slate-200 text-slate-800"
-                    : "bg-[#0b101c]/80 border-brand-border/60 text-slate-300"
-                }`}
-              >
-                <span className="font-bold text-[9px] uppercase tracking-wider block mb-0.5 text-cyan-500">
-                  • Trajectory & Outlook (24–48h)
-                </span>
-                {effectivePillars.escalationOutlook}
-              </div>
+              {digest ? (
+                /* Precomputed: one narrative block, as world-monitor renders it. */
+                <div
+                  className={`p-2.5 rounded border ${
+                    isLight
+                      ? "bg-slate-50 border-slate-200 text-slate-800"
+                      : "bg-[#0b101c]/80 border-brand-border/60 text-slate-300"
+                  }`}
+                >
+                  <span className="font-bold text-[9px] uppercase tracking-wider block mb-0.5 text-orange-500">
+                    • Analysis
+                  </span>
+                  {digest.analysis}
+                </div>
+              ) : null}
+              {(digest
+                ? ([] as Array<[string, string, string | null]>)
+                : ([
+                    [
+                      "Impact & Infrastructure",
+                      "text-orange-500",
+                      effectivePillars.impactAssessment,
+                    ],
+                    [
+                      "Named In Coverage",
+                      "text-emerald-500",
+                      effectivePillars.operationalDynamics,
+                    ],
+                    [
+                      "Reporting Cadence",
+                      "text-cyan-500",
+                      effectivePillars.escalationOutlook,
+                    ],
+                  ] as Array<[string, string, string | null]>)
+              )
+                .filter(([, , body]) => Boolean(body))
+                .map(([label, colour, body]) => (
+                  <div
+                    key={label}
+                    className={`p-2.5 rounded border ${
+                      isLight
+                        ? "bg-slate-50 border-slate-200 text-slate-800"
+                        : "bg-[#0b101c]/80 border-brand-border/60 text-slate-300"
+                    }`}
+                  >
+                    <span
+                      className={`font-bold text-[9px] uppercase tracking-wider block mb-0.5 ${colour}`}
+                    >
+                      • {label}
+                    </span>
+                    {body}
+                  </div>
+                ))}
             </div>
 
             {/* Activity Level Gauge */}
@@ -872,12 +908,26 @@ export default function RegionWindow({
             }`}
           >
             <p className="text-[10px] text-slate-500 leading-relaxed italic">
-              Disclaimer: This is an AI-powered strategic analysis (WebLLM
-              Qwen2.5-1.5B on-device, cached). Provided for situational
-              awareness and monitoring purposes.
+              {digest
+                ? `Brief and analysis precomputed server-side at ${new Date(digest.processedAt).toISOString().slice(11, 16)} UTC from ${digest.mentionCount} dispatches across ${digest.sourceCount} outlets. Extracted from the reporting; no model wrote this.`
+                : aiPillars
+                  ? "Disclaimer: This strategic analysis was written by an on-device model (WebLLM Qwen2.5-1.5B, cached) and may contain inaccuracies."
+                  : "Figures, names and cadence above are extracted directly from the dispatches listed — no model wrote this. Provided for situational awareness only."}
             </p>
           </div>
         </div>
+      )}
+
+      {!isMaximized && !isMinimized && (
+        <ResizeHandles
+          size={size}
+          position={position}
+          setSize={setSize}
+          setPosition={setPosition}
+          onInteractingChange={setIsInteracting}
+          minWidth={300}
+          minHeight={260}
+        />
       )}
     </div>
   );

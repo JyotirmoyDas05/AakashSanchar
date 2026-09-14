@@ -425,38 +425,40 @@ export function extractDynamicEntities(events: NewsEvent[]): {
       .map((p) => p.trim())
       .filter((p) => p.length >= 2);
 
+    // Index EVERY segment, not just first + last. GDELT emits
+    // "City, Admin1, Country" ("Guwahati, Assam, India") and dropping the
+    // middle made whole states/provinces unsearchable and lumped their
+    // events under the country.
     if (parts.length > 0) {
-      // Primary country / major entity (last part)
-      const countryRaw = parts[parts.length - 1];
-      const countryKey = countryRaw.toLowerCase();
-      const canonicalCountry = toTitleCase(countryRaw);
+      const lastIdx = parts.length - 1;
+      const canonicalCountry = toTitleCase(parts[lastIdx]);
+      const countryKey = parts[lastIdx].toLowerCase();
 
-      if (!locMap.has(countryKey)) {
-        locMap.set(countryKey, {
-          name: canonicalCountry,
-          fullName: canonicalCountry,
-          type: "country",
-          events: [],
-        });
-      }
-      locMap.get(countryKey)?.events.push(e);
+      for (let i = 0; i < parts.length; i++) {
+        const isCountry = i === lastIdx;
+        const canonical = toTitleCase(parts[i]);
+        const key = isCountry
+          ? countryKey
+          : `${parts[i].toLowerCase()}_${countryKey}`;
+        // "City, Country" and "City, Admin1, Country" both put the city at 0;
+        // anything between 0 and the country is an administrative region.
+        const type: LocationEntity["type"] = isCountry
+          ? "country"
+          : i === 0
+            ? "city"
+            : "region";
 
-      // City / district entity if multi-part
-      if (parts.length > 1) {
-        const cityRaw = parts[0];
-        const cityKey = `${cityRaw.toLowerCase()}_${countryKey}`;
-        const canonicalCity = toTitleCase(cityRaw);
-        const fullCity = `${canonicalCity}, ${canonicalCountry}`;
-
-        if (!locMap.has(cityKey)) {
-          locMap.set(cityKey, {
-            name: canonicalCity,
-            fullName: fullCity,
-            type: "city",
+        if (!locMap.has(key)) {
+          locMap.set(key, {
+            name: canonical,
+            fullName: isCountry
+              ? canonical
+              : `${canonical}, ${canonicalCountry}`,
+            type,
             events: [],
           });
         }
-        locMap.get(cityKey)?.events.push(e);
+        locMap.get(key)?.events.push(e);
       }
     }
 
@@ -545,17 +547,27 @@ function scoreEvent(e: NewsEvent, tokens: string[]): number {
   const hayTag = (e.tag ?? "").toLowerCase();
   const hayLoc = e.locationName.toLowerCase();
   let s = 0;
+  let hits = 0;
   for (const tok of tokens) {
     const inTitle = fuzzyIncludes(hayTitle, tok);
     const inTag = hayTag === tok || fuzzyIncludes(hayTag, tok);
     const inLoc = fuzzyIncludes(hayLoc, tok);
     const inHay = fuzzyIncludes(hay, tok);
-    if (!inHay) return -1;
+    // Partial matches are ranked down, not discarded. Strict AND meant
+    // "iran nuclear" returned nothing unless one document carried both.
+    if (!inHay) continue;
+    hits++;
     if (inLoc) s += 4;
     else if (inTag) s += 3;
     else if (inTitle) s += 2;
     else s += 1;
   }
+  // 1-2 token queries need one hit; longer ones need at least half, so a
+  // single common word ("floods") can't drag in the whole corpus.
+  const need = tokens.length <= 2 ? 1 : Math.ceil(tokens.length / 2);
+  if (hits < need) return -1;
+  // Coverage weighting: full matches outrank partial ones.
+  s *= hits / tokens.length;
   const hoursAgo = (Date.now() - new Date(e.publishedAt).getTime()) / 3600000;
   s += 0.5 / (1 + Math.max(0, hoursAgo) / 24);
   return s;

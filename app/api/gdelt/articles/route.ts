@@ -5,6 +5,11 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
+import { resolvePlace } from "@/lib/geocode";
+import {
+  buildLocationDigests,
+  type LocationDigest,
+} from "@/lib/locationDigest";
 
 export interface RssArticle {
   url: string;
@@ -15,10 +20,20 @@ export interface RssArticle {
   language: string;
   sourcecountry: string;
   imageUrl?: string;
+  /**
+   * Resolved server-side from the article text against the GeoNames gazetteer.
+   * Absent when no place could be resolved — the client must then omit the
+   * marker rather than invent one.
+   */
+  lat?: number;
+  lng?: number;
+  locationName?: string;
 }
 
 interface CacheEntry {
   articles: RssArticle[];
+  /** Per-location briefs, precomputed with the refresh rather than per request. */
+  digests: LocationDigest[];
   timestamp: number;
 }
 
@@ -259,6 +274,129 @@ const SOUTH_ASIA_FEEDS: RssFeed[] = [
     country: "Myanmar",
     lang: "Burmese",
   },
+  // ── Indian states & union territories ──
+  // Regional outlets so state-level news actually enters the pipeline; the
+  // gazetteer then resolves where each story happened. Every URL below was
+  // probed and returned a live feed with items.
+  ...(
+    [
+      // North East
+      ["eastmojo.com", "https://www.eastmojo.com/feed/"],
+      ["nenow.in", "https://nenow.in/feed"],
+      ["northeasttoday.in", "https://www.northeasttoday.in/feed/"],
+      ["assamtribune.com", "https://assamtribune.com/feed"],
+      ["sentinelassam.com", "https://www.sentinelassam.com/feed"],
+      ["theshillongtimes.com", "https://theshillongtimes.com/feed/"],
+      ["arunachaltimes.in", "https://arunachaltimes.in/index.php/feed/"],
+      ["ifp.co.in", "https://www.ifp.co.in/rss"],
+      ["nagalandpost.com", "https://nagalandpost.com/feed/"],
+      ["morungexpress.com", "https://morungexpress.com/feed"],
+      ["thesikkimchronicle.com", "https://thesikkimchronicle.com/feed/"],
+      ["voiceofsikkim.com", "https://voiceofsikkim.com/feed/"],
+      // South
+      [
+        "thehindu.com/tamil-nadu",
+        "https://www.thehindu.com/news/national/tamil-nadu/feeder/default.rss",
+      ],
+      [
+        "thehindu.com/kerala",
+        "https://www.thehindu.com/news/national/kerala/feeder/default.rss",
+      ],
+      [
+        "thehindu.com/karnataka",
+        "https://www.thehindu.com/news/national/karnataka/feeder/default.rss",
+      ],
+      [
+        "thehindu.com/andhra-pradesh",
+        "https://www.thehindu.com/news/national/andhra-pradesh/feeder/default.rss",
+      ],
+      [
+        "thehindu.com/telangana",
+        "https://www.thehindu.com/news/national/telangana/feeder/default.rss",
+      ],
+      [
+        "thehindu.com/puducherry",
+        "https://www.thehindu.com/news/cities/puducherry/feeder/default.rss",
+      ],
+      ["onmanorama.com", "https://www.onmanorama.com/kerala.feeds.onmrss.xml"],
+      // North & West
+      [
+        "thehindu.com/delhi",
+        "https://www.thehindu.com/news/cities/Delhi/feeder/default.rss",
+      ],
+      [
+        "thehindu.com/mumbai",
+        "https://www.thehindu.com/news/cities/mumbai/feeder/default.rss",
+      ],
+      [
+        "hindustantimes.com/pune",
+        "https://www.hindustantimes.com/feeds/rss/cities/pune-news/rssfeed.xml",
+      ],
+      [
+        "hindustantimes.com/chandigarh",
+        "https://www.hindustantimes.com/feeds/rss/cities/chandigarh-news/rssfeed.xml",
+      ],
+      ["freepressjournal.in", "https://www.freepressjournal.in/stories.rss"],
+      ["greaterkashmir.com", "https://www.greaterkashmir.com/feed"],
+      ["risingkashmir.com", "https://risingkashmir.com/rss"],
+      ["garhwalpost.in", "https://garhwalpost.in/feed/"],
+      ["himachalscape.com", "https://himachalscape.com/feed/"],
+      // East & Central
+      ["millenniumpost.in", "https://www.millenniumpost.in/feed"],
+      ["odishatv.in", "https://odishatv.in/feed"],
+      ["odishabytes.com", "https://odishabytes.com/feed/"],
+      ["prabhatkhabar.com", "https://www.prabhatkhabar.com/feed"],
+      ["avenuemail.in", "https://avenuemail.in/feed/"],
+      ["andamansheekha.com", "https://andamansheekha.com/feed/"],
+      // Thinly-covered states — added so every state/UT clears the per-region floor
+      ["himachalabhiabhi.com", "https://himachalabhiabhi.com/feed/"],
+      ["jharkhandmirror.net", "https://jharkhandmirror.net/feed/"],
+      ["haribhoomi.com", "https://www.haribhoomi.com/feed"],
+      // National aggregator, wide state coverage
+      ["news18.com", "https://www.news18.com/commonfeeds/v1/eng/rss/india.xml"],
+    ] as const
+  ).map(([domain, url]) => ({ domain, url, country: "India" })),
+  // Hindi-language state desks
+  {
+    url: "https://www.amarujala.com/rss/uttar-pradesh.xml",
+    domain: "amarujala.com",
+    country: "India",
+    lang: "Hindi",
+  },
+  {
+    url: "https://www.bhaskar.com/rss-v1--category-1731.xml",
+    domain: "bhaskar.com",
+    country: "India",
+    lang: "Hindi",
+  },
+
+  // ── India's neighbours — these had little or no coverage in the feed set ──
+  {
+    url: "https://bhutanlive.com/feed/",
+    domain: "bhutanlive.com",
+    country: "Bhutan",
+  },
+  {
+    url: "https://www.khaama.com/feed/",
+    domain: "khaama.com",
+    country: "Afghanistan",
+  },
+  {
+    url: "https://www.ariananews.af/feed/",
+    domain: "ariananews.af",
+    country: "Afghanistan",
+  },
+  {
+    url: "https://www.newswire.lk/feed/",
+    domain: "newswire.lk",
+    country: "Sri Lanka",
+  },
+  {
+    url: "https://myanmar-now.org/en/feed/",
+    domain: "myanmar-now.org",
+    country: "Myanmar",
+  },
+
   // ── Global context wires ──
   {
     url: "https://feeds.bbci.co.uk/news/world/rss.xml",
@@ -493,6 +631,21 @@ async function fetchAllFeeds(feeds: RssFeed[]): Promise<RssArticle[]> {
     (a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime(),
   );
 
+  // Resolve a real place per article. Done here, server-side, because the
+  // gazetteer is ~3 MB and must never reach the browser. Articles that resolve
+  // to nothing keep lat/lng undefined and simply get no map marker.
+  let placed = 0;
+  for (const art of all) {
+    const hit = resolvePlace(art.title, art.description, art.sourcecountry);
+    if (hit) {
+      art.lat = hit.lat;
+      art.lng = hit.lng;
+      art.locationName = hit.locationName;
+      placed++;
+    }
+  }
+  console.log(`[RSS Articles] geocoded ${placed}/${all.length} articles`);
+
   return all;
 }
 
@@ -606,9 +759,28 @@ async function triggerBackgroundRefresh(cacheKey: string, region: string) {
   try {
     const articles = await fetchAllFeeds(feedsForRegion(region));
     if (articles.length > 0) {
-      cache.set(cacheKey, { articles, timestamp: Date.now() });
+      // One pass over the geocoded set, once per refresh. This is the whole
+      // "server-side precompute" — no cron, no database, no per-request cost.
+      const digests = buildLocationDigests(
+        articles
+          .filter((a) => Number.isFinite(a.lat) && Number.isFinite(a.lng))
+          .map((a) => ({
+            id: a.url,
+            title: a.title,
+            description: a.description,
+            source: a.domain,
+            category: "news" as const,
+            tag: "General",
+            publishedAt: a.pubDate,
+            locationName: a.locationName ?? "",
+            lat: a.lat as number,
+            lng: a.lng as number,
+            intensity: 0.6,
+          })),
+      );
+      cache.set(cacheKey, { articles, digests, timestamp: Date.now() });
       console.log(
-        `[RSS Articles] Cached ${articles.length} articles (${region})`,
+        `[RSS Articles] Cached ${articles.length} articles, ${digests.length} location digests (${region})`,
       );
     } else {
       console.warn("[RSS Articles] All feeds returned empty, retrying in 60s");
@@ -638,6 +810,7 @@ export async function GET(request: NextRequest) {
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return NextResponse.json({
       articles: cached.articles,
+      locations: cached.digests,
       cached: true,
       cachedAt: new Date(cached.timestamp).toISOString(),
       count: cached.articles.length,
@@ -653,6 +826,7 @@ export async function GET(request: NextRequest) {
   const fallback = cached?.articles ?? mockArticlesForRegion(region);
   return NextResponse.json({
     articles: fallback,
+    locations: cached?.digests ?? [],
     cached: true,
     stale: true,
     cachedAt: cached

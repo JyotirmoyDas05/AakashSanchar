@@ -418,6 +418,20 @@ function HeatLayer({ events }: { events: NewsEvent[] }) {
   return null;
 }
 
+function tooltipHtml(ev: NewsEvent): string {
+  return `
+          <div class="font-mono text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            ${ev.source} • ${ev.locationName}
+          </div>
+          <div class="font-semibold text-xs mt-0.5 max-w-xs truncate text-brand-text-primary">
+            ${ev.title}
+          </div>
+        `;
+}
+
+/** Above this, a terminal cluster opens a region window instead of fanning out. */
+const SPIDERFY_MAX = 10;
+
 // Clustered Markers controller using Leaflet.markercluster
 function ClusteredMarkers({
   events,
@@ -438,15 +452,22 @@ function ClusteredMarkers({
 }) {
   const map = useMap();
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
+  const markersRef = useRef<Map<string, L.Marker>>(new Map());
+  const prevSelectedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Native Leaflet cluster group matching world-monitor specs
-    // Restored spiderfying: zoomToBounds true, window only for small/high-zoom clusters
+    // Click behaviour is driven by the handler below, not by markercluster's
+    // defaults. Most dispatches resolve to a city or a country, so thousands of
+    // markers share a few hundred exact coordinates — zoomToBounds cannot split
+    // a zero-width box, and the fallback spiderfied 48 markers into a spiral.
     const clusterGroup = L.markerClusterGroup({
       showCoverageOnHover: false,
-      zoomToBoundsOnClick: true,
-      spiderfyOnMaxZoom: true,
+      zoomToBoundsOnClick: false,
+      spiderfyOnMaxZoom: false,
       maxClusterRadius: 50,
+      // Thousands of markers now that RSS carries real coordinates; add them in
+      // slices so a feed refresh cannot block the main thread.
+      chunkedLoading: true,
       iconCreateFunction: (cluster) => {
         const count = cluster.getChildCount();
         const markers = cluster.getAllChildMarkers();
@@ -504,24 +525,42 @@ function ClusteredMarkers({
     clusterGroupRef.current = clusterGroup;
     map.addLayer(clusterGroup);
 
-    if (onClusterSelect) {
+    {
       const handler = (e: unknown) => {
         const ce = e as { layer: L.MarkerCluster; latlng: L.LatLng };
-        const childCount = ce.layer.getChildCount();
-        const currentZoom = map.getZoom();
-        // Only open RegionWindow for small or high-zoom clusters (search-filtered Nepal Floods etc.)
-        // Big diverse clusters at low zoom just zoom/spiderfy as before — fixes "every cluster opens window"
-        if (currentZoom < 7 && childCount > 10) return;
         const markers = ce.layer.getAllChildMarkers() as unknown as Array<
-          L.Marker & { options: { eventId?: string } }
+          L.Marker & { options: { eventId?: string; place?: string } }
         >;
+
+        // Do every dispatch in this cluster resolve to the SAME place? If so
+        // there is nothing informative left to separate — the markers are only
+        // held apart by the de-stacking nudge — so show the place itself.
+        const places = new Set(markers.map((m) => m.options.place));
+        const isOnePlace = places.size === 1;
+
+        if (!isOnePlace) {
+          // Still a mix of places: zoom in and let it break apart, which is what
+          // a cluster click should do.
+          const bounds = ce.layer.getBounds();
+          const targetZoom = map.getBoundsZoom(bounds, false, L.point(40, 40));
+          if (targetZoom > map.getZoom()) {
+            map.fitBounds(bounds, { padding: [40, 40] });
+            return;
+          }
+          // Cannot zoom further and they are different places — fan them out.
+          if (ce.layer.getChildCount() <= SPIDERFY_MAX) {
+            (ce.layer as unknown as { spiderfy: () => void }).spiderfy();
+            return;
+          }
+        }
+
         const ids = markers
           .map((m) => (m.options as unknown as { eventId?: string }).eventId)
           .filter(Boolean) as string[];
         const containerPoint = map.latLngToContainerPoint(ce.latlng);
         const container = map.getContainer();
         const rect = container.getBoundingClientRect();
-        onClusterSelect(ids, {
+        onClusterSelect?.(ids, {
           x: rect.left + containerPoint.x,
           y: rect.top + containerPoint.y,
         });
@@ -537,67 +576,58 @@ function ClusteredMarkers({
         }
       };
     }
-
-    return () => {
-      if (clusterGroupRef.current) {
-        map.removeLayer(clusterGroupRef.current);
-        clusterGroupRef.current = null;
-      }
-    };
   }, [map, onClusterSelect]);
 
-  // Sync Leaflet markers to events / selected marker changes
+  // Sync Leaflet markers to the event set. Deliberately NOT keyed on
+  // selectedEventId: rebuilding every layer on a single marker click tore down
+  // spiderfied clusters mid-interaction (they came back collapsed/inert) and
+  // rebuilt hundreds of icons for a two-marker state change. Selection is
+  // applied in the follow-up effect via setIcon instead.
   useEffect(() => {
     const clusterGroup = clusterGroupRef.current;
     if (!clusterGroup) return;
 
     clusterGroup.clearLayers();
+    markersRef.current.clear();
 
-    const markers = events.map((ev) => {
-      const isSelected = ev.id === selectedEventId;
-      const tagKey = ev.tag ?? ev.category;
-      const bucket = bucketForTag(tagKey);
-      const marker = L.marker([ev.lat, ev.lng], {
-        icon: createTacticalIcon(tagKey, ev.intensity, isSelected),
-        category: bucket,
-        eventId: ev.id,
-        // biome-ignore lint/suspicious/noExplicitAny: leaflet marker options does not include custom attributes
-      } as any);
+    // One source with a bad coordinate used to throw "Invalid LatLng (NaN, NaN)"
+    // out of L.marker and take the whole map down. Guard here, where every
+    // source's markers are built, rather than in each producer.
+    const markers = events
+      .filter((ev) => Number.isFinite(ev.lat) && Number.isFinite(ev.lng))
+      .map((ev) => {
+        const tagKey = ev.tag ?? ev.category;
+        const bucket = bucketForTag(tagKey);
+        const marker = L.marker([ev.lat, ev.lng], {
+          icon: createTacticalIcon(tagKey, ev.intensity, false),
+          category: bucket,
+          eventId: ev.id,
+          place: ev.locationName,
+          // biome-ignore lint/suspicious/noExplicitAny: leaflet marker options does not include custom attributes
+        } as any);
 
-      marker.on("click", (e: L.LeafletMouseEvent) => {
-        const containerPoint = map.latLngToContainerPoint(e.latlng);
-        const mapContainer = map.getContainer();
-        const rect = mapContainer.getBoundingClientRect();
-        const screenPos = {
-          x: rect.left + containerPoint.x,
-          y: rect.top + containerPoint.y,
-        };
-        // Hide tooltip immediately on click
-        marker.closeTooltip();
-        onEventSelect(ev.id, screenPos);
+        marker.on("click", (e: L.LeafletMouseEvent) => {
+          const containerPoint = map.latLngToContainerPoint(e.latlng);
+          const mapContainer = map.getContainer();
+          const rect = mapContainer.getBoundingClientRect();
+          const screenPos = {
+            x: rect.left + containerPoint.x,
+            y: rect.top + containerPoint.y,
+          };
+          // Hide tooltip immediately on click
+          marker.closeTooltip();
+          onEventSelect(ev.id, screenPos);
+        });
+
+        marker.bindTooltip(tooltipHtml(ev), {
+          direction: "top",
+          offset: [0, -5],
+          opacity: 0.95,
+        });
+
+        markersRef.current.set(ev.id, marker);
+        return marker;
       });
-
-      // Only bind tooltip when not selected (avoid tooltip overlapping the card/window)
-      if (!isSelected) {
-        marker.bindTooltip(
-          `
-          <div class="font-mono text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-            ${ev.source} • ${ev.locationName}
-          </div>
-          <div class="font-semibold text-xs mt-0.5 max-w-xs truncate text-brand-text-primary">
-            ${ev.title}
-          </div>
-        `,
-          {
-            direction: "top",
-            offset: [0, -5],
-            opacity: 0.95,
-          },
-        );
-      }
-
-      return marker;
-    });
 
     clusterGroup.addLayers(markers);
 
@@ -616,7 +646,37 @@ function ClusteredMarkers({
       if (raf) cancelAnimationFrame(raf);
       if (timer) clearTimeout(timer);
     };
-  }, [events, selectedEventId, onEventSelect, map]);
+  }, [events, onEventSelect, map]);
+
+  // Apply selection in place: swap the icon on the two markers that changed and
+  // drop the selected marker's tooltip so it can't sit on top of the HotspotCard.
+  useEffect(() => {
+    const prevId = prevSelectedRef.current;
+    prevSelectedRef.current = selectedEventId;
+    if (prevId === selectedEventId) return;
+
+    const paint = (id: string | null, isSelected: boolean) => {
+      if (!id) return;
+      const marker = markersRef.current.get(id);
+      const ev = events.find((e) => e.id === id);
+      if (!marker || !ev) return;
+      marker.setIcon(
+        createTacticalIcon(ev.tag ?? ev.category, ev.intensity, isSelected),
+      );
+      if (isSelected) {
+        marker.unbindTooltip();
+      } else if (!marker.getTooltip()) {
+        marker.bindTooltip(tooltipHtml(ev), {
+          direction: "top",
+          offset: [0, -5],
+          opacity: 0.95,
+        });
+      }
+    };
+
+    paint(prevId, false);
+    paint(selectedEventId, true);
+  }, [selectedEventId, events]);
 
   // Keep clusters in sync with any programmatic viewport change (flyTo,
   // ViewGuard's setMinZoom/setMaxBounds). Without this a pan/zoom that

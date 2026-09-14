@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check",
-    "format": "biome format --write"
+    "format": "biome format --write",
+    "gazetteer": "node scripts/build-gazetteer.mjs",
+    "test": "tsx lib/search.test.ts && tsx lib/geocode.test.ts && tsx lib/regionAggregate.test.ts && tsx lib/regionAnalysis.test.ts && tsx lib/locationDigest.test.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

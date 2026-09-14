@@ -1,4 +1,5 @@
 import { formatTime } from "@/lib/formatTime";
+import { buildAnalysis } from "@/lib/regionAnalysis";
 import { bucketForTag } from "@/lib/tagPalette";
 import type { NewsCategory, NewsEvent } from "@/types/news";
 
@@ -19,9 +20,10 @@ export interface ThreatVector {
 }
 
 export interface StrategicAnalysisPillars {
-  impactAssessment: string;
-  operationalDynamics: string;
-  escalationOutlook: string;
+  /** null when the dispatches do not support the claim — the panel omits it. */
+  impactAssessment: string | null;
+  operationalDynamics: string | null;
+  escalationOutlook: string | null;
   threatBreakdown: ThreatVector[];
   flashpoints: string[];
 }
@@ -392,74 +394,17 @@ function synthesizeStrategicAnalysis(
   locationName: string,
   query?: string,
 ): StrategicAnalysisPillars {
-  const cats = [...new Set(events.map((e) => e.category || "news"))];
-  const themes = extractCoreThemes(events);
+  // Was four hardcoded prose templates keyed on `cats.includes("disaster")`,
+  // so a single flood story among eight made an entire region read as a flood
+  // zone, in identical wording to every other flood zone. Now derived from the
+  // dispatches — see lib/regionAnalysis.ts.
   const targetName = (query || locationName || "the region").trim();
-  const lead1 = themes[0] ? themes[0].title : "active developments";
-  const flashpoints = extractFlashpoints(events, targetName);
-  const threatBreakdown = calculateThreatBreakdown(events);
-  const metric = extractKeyMetrics(events);
-  const flashpointStr = flashpoints.length
-    ? ` (${flashpoints.slice(0, 2).join(", ")})`
-    : "";
-
-  if (cats.includes("disaster")) {
-    const impact = metric
-      ? `Severe physical and infrastructure disruption confirmed across ${targetName}${flashpointStr}, with reports confirming ${metric}. River basins and transit routes face acute blockage.`
-      : `Critical environmental and physical strain recorded across ${targetName}${flashpointStr}, causing localized supply bottlenecks and transit route inundations.`;
-
-    const operational = `National disaster management detachments and armed forces engineering battalions deployed to establish emergency evacuation perimeters and reinforce critical containment barriers.`;
-
-    const outlook = `Elevated risk of secondary environmental hazards over the next 24–48 hours; logistical recovery depends on local meteorological clearance and structural drainage capacity.`;
-
-    return {
-      impactAssessment: impact,
-      operationalDynamics: operational,
-      escalationOutlook: outlook,
-      threatBreakdown,
-      flashpoints,
-    };
-  }
-
-  if (cats.includes("conflict")) {
-    const impact = metric
-      ? `Kinetic military engagements in ${targetName}${flashpointStr} have resulted in ${metric}. Critical defense installations and supply arteries operate under reinforced alert.`
-      : `Tactical supply lines and civilian corridors in ${targetName}${flashpointStr} experience acute operational friction, with forward assets operating under reinforced defense postures.`;
-
-    const operational = `Surveillance radar networks and rapid-reaction detachments maintain continuous observation of demarcation perimeters to intercept potential cross-border incursions.`;
-
-    const outlook = `High likelihood of localized tactical skirmishes and retaliatory strikes in the next 24–48 hours; de-escalation hinges on active diplomatic backchannels and tactical restraint.`;
-
-    return {
-      impactAssessment: impact,
-      operationalDynamics: operational,
-      escalationOutlook: outlook,
-      threatBreakdown,
-      flashpoints,
-    };
-  }
-
-  if (cats.includes("health")) {
-    const impact = `Healthcare centers and epidemiological units in ${targetName}${flashpointStr} face elevated clinical throughput demand as screening perimeters are deployed.`;
-    const operational = `Rapid diagnostic response units and regional health detachments are enforcing targeted containment protocols and coordinating medical supplies.`;
-    const outlook = `Health trajectory remains highly sensitive to containment compliance and verified laboratory diagnostic trends over the next 48–72 hours.`;
-
-    return {
-      impactAssessment: impact,
-      operationalDynamics: operational,
-      escalationOutlook: outlook,
-      threatBreakdown,
-      flashpoints,
-    };
-  }
-
-  return {
-    impactAssessment: `Municipal channels, commercial networks, and civic infrastructure in ${targetName}${flashpointStr} maintain operational continuity while adapting to current developments regarding ${lead1.toLowerCase()}.`,
-    operationalDynamics: `Inter-agency administrative units and civic stakeholders are actively executing policy directives and monitoring regional feedback mechanisms.`,
-    escalationOutlook: `Near-term projection indicates steady institutional continuity, with localized volatility contained as administrative directives take effect over the next 24–48 hours.`,
-    threatBreakdown,
-    flashpoints,
-  };
+  return buildAnalysis(
+    events,
+    targetName,
+    calculateThreatBreakdown(events),
+    extractFlashpoints(events, targetName),
+  );
 }
 
 export function synthesizeRegionIntelligence(

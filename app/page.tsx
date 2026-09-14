@@ -25,58 +25,41 @@ import { useGdeltEvents } from "@/hooks/useGdeltEvents";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useUrlState } from "@/hooks/useUrlState";
 import { filterEvents } from "@/lib/filterEvents";
-import { isRssRelevantForMap } from "@/lib/regionalRelevance";
+import { applyCoordinateJitter } from "@/lib/gdelt";
+import {
+  aggregateRegionalEvents,
+  mostSpecificPlaceName,
+  placeParts,
+} from "@/lib/regionAggregate";
 import { resolveRegion } from "@/lib/regions";
-import { searchEvents } from "@/lib/search";
+import { type SpatialBounds, searchEvents } from "@/lib/search";
 import type { NewsCategory, NewsEvent } from "@/types/news";
 
-function aggregateRegionalEvents(
-  primaryEvents: NewsEvent[],
-  allEvents: NewsEvent[],
-  searchQuery?: string | null,
-): NewsEvent[] {
-  if (!primaryEvents.length) return [];
-  // If search query is active, search filter is already applied
-  if (searchQuery) return primaryEvents;
+/** Markers drawn per state/province/UT (or per country where none is known). */
+const PER_REGION_MARKERS = 8;
 
-  const first = primaryEvents[0];
-  const locParts = first.locationName.split(",");
-  const targetEntity = (
-    locParts.length > 1 ? locParts[locParts.length - 1] : locParts[0]
-  )
-    .trim()
-    .toLowerCase();
-
-  const cLat =
-    primaryEvents.reduce((s, e) => s + e.lat, 0) / primaryEvents.length;
-  const cLng =
-    primaryEvents.reduce((s, e) => s + e.lng, 0) / primaryEvents.length;
-
-  const seen = new Set(primaryEvents.map((e) => e.id));
-  const aggregated = [...primaryEvents];
-
-  for (const e of allEvents) {
-    if (seen.has(e.id)) continue;
-
-    const loc = e.locationName.toLowerCase();
-    const isSameEntity = targetEntity.length >= 3 && loc.includes(targetEntity);
-
-    // Spatial proximity (~500km / ~5.0 degrees)
-    const dLat = Math.abs(e.lat - cLat);
-    const dLng = Math.abs(e.lng - cLng);
-    const isNearby = dLat <= 5.0 && dLng <= 6.5;
-
-    if (isSameEntity || isNearby) {
-      seen.add(e.id);
-      aggregated.push(e);
-    }
-  }
-
-  aggregated.sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+// Frame the map on a matched entity. Prefers the density centroid over the
+// bounding-box midpoint: a box padded around one distant outlier still has a
+// midpoint out at sea, which is how "Nepal" used to land in the Red Sea.
+function framingFor(
+  bounds: SpatialBounds | null,
+  centroid?: [number, number] | null,
+): { center: [number, number]; zoom: number } | null {
+  if (!bounds) return null;
+  const center: [number, number] = centroid ?? [
+    (bounds.minLat + bounds.maxLat) / 2,
+    (bounds.minLng + bounds.maxLng) / 2,
+  ];
+  const delta = Math.max(
+    bounds.maxLat - bounds.minLat,
+    bounds.maxLng - bounds.minLng,
   );
-  return aggregated;
+  let zoom = 4.5;
+  if (delta < 1.2) zoom = 9;
+  else if (delta < 3.5) zoom = 7.5;
+  else if (delta < 7) zoom = 6.5;
+  else if (delta < 14) zoom = 5.5;
+  return { center, zoom };
 }
 
 export default function Home() {
@@ -100,8 +83,17 @@ export default function Home() {
     y: number;
   } | null>(null);
 
+  // Marks a query as already framed. handleGeneralSelect claims it so the
+  // ?q= fallback effect below does not re-run a naive whole-corpus search and
+  // overwrite the precise entity bounds the user actually clicked.
+  const hasAutoOpenedForSearch = useRef<string | null>(null);
+
   // Region window: multiple events for a cluster
   const [regionEventIds, setRegionEventIds] = useState<string[] | null>(null);
+  // The query the region window was opened FOR. null when it was opened by a
+  // cluster click. Previously the window read the live ?q= instead, so a stale
+  // search ("nepal") relabelled and re-filtered every later cluster click.
+  const [regionQuery, setRegionQuery] = useState<string | null>(null);
   const [regionPos, setRegionPos] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -171,7 +163,8 @@ export default function Home() {
 
   const { events: gdeltEvents } = useGdeltEvents();
   const activeRegion = resolveRegion(settings.regionView);
-  const { articles: tickerArticles } = useGdeltArticles(activeRegion.id);
+  const { articles: tickerArticles, digests: locationDigests } =
+    useGdeltArticles(activeRegion.id);
 
   // Fly the map to the active region's preset view on load and on toggle.
   // Skip the very first run only for World so a shared/custom view in the URL
@@ -209,10 +202,9 @@ export default function Home() {
     const candidates = tickerArticles.filter(
       (a) =>
         a.locationName !== "SYSTEM STATUS" &&
+        // Unresolvable articles carry NaN and are simply not drawn.
         Number.isFinite(a.lat) &&
-        Number.isFinite(a.lng) &&
-        (activeRegion.id === "world" ||
-          isRssRelevantForMap(a.title, a.description)),
+        Number.isFinite(a.lng),
     );
     const filtered = filterEvents(
       candidates,
@@ -220,12 +212,29 @@ export default function Home() {
       timeRange,
       activeRegion.bbox,
     );
-    // Newest first, cap to avoid marker overload
     filtered.sort(
       (a, b) =>
         new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
     );
-    return filtered.slice(0, 120);
+    // Stratified cap, not a global one. A plain "newest N worldwide" starves
+    // whole regions (Nepal once got 2 of 120); an uncapped map buries them under
+    // 350-marker metro stacks. Take the newest few per state/province instead,
+    // so every state, UT and neighbouring country keeps a presence.
+    const perRegion = new Map<string, NewsEvent[]>();
+    for (const e of filtered) {
+      const { admin1, country } = placeParts(e);
+      const key = admin1 ? `${admin1}|${country}` : country;
+      const bucket = perRegion.get(key);
+      if (bucket) {
+        if (bucket.length < PER_REGION_MARKERS) bucket.push(e);
+      } else {
+        perRegion.set(key, [e]);
+      }
+    }
+    // Nudge coincident markers apart (~250 m, deterministic). Most dispatches
+    // resolve to a city or country centroid, so without this they land on one
+    // pixel and no amount of zooming separates them.
+    return applyCoordinateJitter([...perRegion.values()].flat());
   }, [tickerArticles, activeLayers, timeRange, activeRegion]);
 
   const mapEvents = useMemo(() => {
@@ -273,28 +282,63 @@ export default function Home() {
   // Resolve cluster region events — when search is active, this is search-filtered
   const rawRegionEvents = useMemo(() => {
     if (!regionEventIds) return null;
-    return displayMapEvents.filter((e) => regionEventIds.includes(e.id));
+    // Set, not Array#includes: a big cluster against a few thousand markers is
+    // otherwise a million string compares on every render.
+    const wanted = new Set(regionEventIds);
+    return displayMapEvents.filter((e) => wanted.has(e.id));
   }, [displayMapEvents, regionEventIds]);
 
   const regionEvents = useMemo(() => {
     if (!rawRegionEvents?.length) return null;
-    return aggregateRegionalEvents(rawRegionEvents, displayMapEvents, searchQ);
-  }, [rawRegionEvents, displayMapEvents, searchQ]);
+    return aggregateRegionalEvents(
+      rawRegionEvents,
+      displayMapEvents,
+      regionQuery,
+    );
+  }, [rawRegionEvents, displayMapEvents, regionQuery]);
 
   // Region window location name (derive from search target or events)
   const regionLocationName = useMemo(() => {
-    if (searchResultForMap?.primaryCountry) {
-      return searchResultForMap.primaryCountry.toUpperCase();
-    }
-    if (searchQ) {
-      return searchQ.toUpperCase();
+    // Only a search-opened window is named after the query.
+    if (regionQuery) {
+      if (searchResultForMap?.primaryCountry) {
+        return searchResultForMap.primaryCountry.toUpperCase();
+      }
+      return regionQuery.toUpperCase();
     }
     if (!regionEvents?.length) return "REGION";
-    const loc = regionEvents[0].locationName;
-    // Extract country portion (last part after comma)
-    const parts = loc.split(",");
-    return (parts[parts.length - 1]?.trim() || loc).toUpperCase();
-  }, [regionEvents, searchResultForMap, searchQ]);
+    // The most specific place the cluster agrees on — a shared city, else the
+    // shared state, else the dominant country. Labelling a Guwahati cluster
+    // "INDIA" was true and useless.
+    return mostSpecificPlaceName(
+      regionEvents.filter((e) => e.locationName !== "SYSTEM STATUS"),
+    ).toUpperCase();
+  }, [regionEvents, searchResultForMap, regionQuery]);
+
+  // A precomputed digest applies only when the whole region is one resolved
+  // place — the same rule the cluster click uses. Mixed regions fall back to
+  // the on-device synthesis.
+  const regionDigest = useMemo(() => {
+    if (!regionEvents?.length) return null;
+    // Most specific level the whole region agrees on, matching how the panel
+    // titles itself: one exact place, else one state, else one country.
+    const exact = new Set(regionEvents.map((e) => e.locationName));
+    if (exact.size === 1) {
+      const hit = locationDigests.get([...exact][0]);
+      if (hit) return hit;
+    }
+    const parts = regionEvents.map(placeParts);
+    const admin1 = new Set(parts.map((p) => p.admin1).filter(Boolean));
+    const country = new Set(parts.map((p) => p.country).filter(Boolean));
+    if (admin1.size === 1 && country.size === 1) {
+      const hit = locationDigests.get(`${[...admin1][0]}, ${[...country][0]}`);
+      if (hit) return hit;
+    }
+    if (country.size === 1) {
+      return locationDigests.get([...country][0]) ?? null;
+    }
+    return null;
+  }, [regionEvents, locationDigests]);
 
   const handleToggleWidget = useCallback((widgetId: string) => {
     setActiveWidgets((prev) =>
@@ -340,6 +384,7 @@ export default function Home() {
       if (eventId) {
         setRegionEventIds(null);
         setRegionPos(null);
+        setRegionQuery(null);
       }
     },
     [],
@@ -350,6 +395,7 @@ export default function Home() {
     (eventIds: string[], screenPos: { x: number; y: number }) => {
       setRegionEventIds(eventIds);
       setRegionPos(screenPos);
+      setRegionQuery(null);
       // Close single event card
       setSelectedEventId(null);
       setSelectedEventPos(null);
@@ -361,8 +407,12 @@ export default function Home() {
     (eventId: string, coords: [number, number]) => {
       setSelectedEventId(eventId);
       setSelectedEventPos(null); // no screen pos from search
-      setCenter(coords);
-      setZoom(10);
+      // A wire item with no resolved place has NaN coords — open it without
+      // moving the map rather than flying the viewport to nowhere.
+      if (Number.isFinite(coords[0]) && Number.isFinite(coords[1])) {
+        setCenter(coords);
+        setZoom(10);
+      }
       setActiveTab("map");
     },
     [setCenter, setZoom],
@@ -372,31 +422,23 @@ export default function Home() {
     (
       query: string,
       results: typeof mapEvents,
-      bounds: {
-        minLat: number;
-        maxLat: number;
-        minLng: number;
-        maxLng: number;
-      } | null,
+      bounds: SpatialBounds | null,
       primaryCountry?: string | null,
+      centroid?: [number, number] | null,
     ) => {
       const canonicalQuery = primaryCountry || query;
+      // Claim the query BEFORE setQ, so the ?q= effect treats it as handled.
+      // Without this the effect fires on the next render and replaces this
+      // entity's framing and results with a generic text search.
+      // setQ truncates to 80 chars; claim the same string it will store.
+      hasAutoOpenedForSearch.current = canonicalQuery.slice(0, 80);
+      setRegionQuery(canonicalQuery.slice(0, 80));
       setQ(canonicalQuery);
       setActiveTab("map");
-      if (bounds) {
-        const cLat = (bounds.minLat + bounds.maxLat) / 2;
-        const cLng = (bounds.minLng + bounds.maxLng) / 2;
-        const dLat = bounds.maxLat - bounds.minLat;
-        const dLng = bounds.maxLng - bounds.minLng;
-        const delta = Math.max(dLat, dLng);
-        let z = 7;
-        if (delta < 1.2) z = 9;
-        else if (delta < 3.5) z = 7.5;
-        else if (delta < 7) z = 6.5;
-        else if (delta < 14) z = 5.5;
-        else z = 4.5;
-        setCenter([cLat, cLng]);
-        setZoom(z);
+      const framing = framingFor(bounds, centroid);
+      if (framing) {
+        setCenter(framing.center);
+        setZoom(framing.zoom);
       }
       setRegionEventIds(results.map((e) => e.id));
       setRegionPos({
@@ -410,7 +452,6 @@ export default function Home() {
   );
 
   // Auto-open RegionWindow when ?q= is present on load / change (search → window)
-  const hasAutoOpenedForSearch = useRef<string | null>(null);
   useEffect(() => {
     if (!isUrlStateLoaded) return;
     if (
@@ -426,22 +467,15 @@ export default function Home() {
     }
     if (hasAutoOpenedForSearch.current === searchQ) return;
     hasAutoOpenedForSearch.current = searchQ;
-    const bounds = searchResultForMap.bounds;
-    if (bounds) {
-      const cLat = (bounds.minLat + bounds.maxLat) / 2;
-      const cLng = (bounds.minLng + bounds.maxLng) / 2;
-      const dLat = bounds.maxLat - bounds.minLat;
-      const dLng = bounds.maxLng - bounds.minLng;
-      const delta = Math.max(dLat, dLng);
-      let z = 7;
-      if (delta < 1.2) z = 9;
-      else if (delta < 3.5) z = 7.5;
-      else if (delta < 7) z = 6.5;
-      else if (delta < 14) z = 5.5;
-      else z = 4.5;
-      setCenter([cLat, cLng]);
-      setZoom(z);
+    const framing = framingFor(
+      searchResultForMap.bounds,
+      searchResultForMap.centroid,
+    );
+    if (framing) {
+      setCenter(framing.center);
+      setZoom(framing.zoom);
     }
+    setRegionQuery(searchQ);
     setRegionEventIds(searchResultForMap.results.map((e) => e.id));
     setRegionPos({
       x: typeof window !== "undefined" ? window.innerWidth / 2 : 600,
@@ -461,6 +495,7 @@ export default function Home() {
       setSelectedEventPos(null);
       setRegionEventIds(null);
       setRegionPos(null);
+      setRegionQuery(null);
       setIsLocateOpen(false);
       setIsFilterOpen(false);
       setIsSettingsOpen(false);
@@ -602,12 +637,14 @@ export default function Home() {
             <RegionWindow
               events={regionEvents}
               locationName={regionLocationName}
-              query={searchQ ?? undefined}
+              digest={regionDigest}
+              query={regionQuery ?? undefined}
               theme={settings.theme}
               layoutMode={settings.layoutMode}
               onClose={() => {
                 setRegionEventIds(null);
                 setRegionPos(null);
+                setRegionQuery(null);
                 if (searchQ) setQ(null);
               }}
               defaultPosition={
