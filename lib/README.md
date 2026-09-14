@@ -76,19 +76,19 @@ graph TD
     H -->|MEDIUM| J
     H -->|NO| K
     
-    style A fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    style B fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    style C fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    style D1 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style D2 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style D3 fill:#ffebee,stroke:#b71c1c,stroke-width:2px
-    style E fill:#bbdefb,stroke:#1565c0,stroke-width:2px
-    style F fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style G fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style H fill:#ffe0b2,stroke:#e65100,stroke-width:2px
-    style I fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style J fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style K fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    style A fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000000
+    style B fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
+    style C fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
+    style D1 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style D2 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style D3 fill:#ffebee,stroke:#b71c1c,stroke-width:2px,color:#000000
+    style E fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000000
+    style F fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000000
+    style G fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000000
+    style H fill:#ffe0b2,stroke:#e65100,stroke-width:2px,color:#000000
+    style I fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style J fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000000
+    style K fill:#ffcdd2,stroke:#c62828,stroke-width:2px,color:#000000
 ```
 
 ### N-gram Extraction
@@ -341,14 +341,14 @@ graph LR
     Good --> G1
     G1 --> G2
     
-    style Prob fill:#e3f2fd,stroke:#1565c0
-    style Bad1 fill:#ffcdd2,stroke:#c62828,stroke-width:2px
-    style Bad2 fill:#ffcdd2,stroke:#c62828,stroke-width:2px
-    style R1 fill:#ffebee,stroke:#b71c1c
-    style R2 fill:#ffebee,stroke:#b71c1c
-    style Good fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style G1 fill:#e8f5e9,stroke:#2e7d32
-    style G2 fill:#c8e6c9,stroke:#1b5e20,stroke-width:2px
+    style Prob fill:#e3f2fd,stroke:#1565c0,color:#000000
+    style Bad1 fill:#ffcdd2,stroke:#c62828,stroke-width:2px,color:#000000
+    style Bad2 fill:#ffcdd2,stroke:#c62828,stroke-width:2px,color:#000000
+    style R1 fill:#ffebee,stroke:#b71c1c,color:#000000
+    style R2 fill:#ffebee,stroke:#b71c1c,color:#000000
+    style Good fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style G1 fill:#e8f5e9,stroke:#2e7d32,color:#000000
+    style G2 fill:#c8e6c9,stroke:#1b5e20,stroke-width:2px,color:#000000
 ```
 
 ### Algorithm

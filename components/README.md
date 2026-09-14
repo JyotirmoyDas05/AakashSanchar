@@ -44,20 +44,20 @@ graph TD
     Dashboard --> Hotspot
     Dashboard --> Header
     
-    style Dashboard fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    style MapW fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style MapC fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style Rail fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    style Cmd fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    style Settings fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    style Ticker fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    style Stocks fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    style Streams fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    style Cameras fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    style Outbreaks fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    style Region fill:#e0f2f1,stroke:#00695c,stroke-width:2px
-    style Hotspot fill:#ffebee,stroke:#b71c1c,stroke-width:2px
-    style Header fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Dashboard fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000000
+    style MapW fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
+    style MapC fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
+    style Rail fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
+    style Cmd fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style Settings fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style Ticker fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000000
+    style Stocks fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000000
+    style Streams fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000000
+    style Cameras fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000000
+    style Outbreaks fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000000
+    style Region fill:#e0f2f1,stroke:#00695c,stroke-width:2px,color:#000000
+    style Hotspot fill:#ffebee,stroke:#b71c1c,stroke-width:2px,color:#000000
+    style Header fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000000
 ```
 
 ---

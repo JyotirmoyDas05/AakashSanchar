@@ -34,10 +34,10 @@ graph TD
     B --> C
     C --> D
     
-    style A fill:#e1f5ff,stroke:#01579b,stroke-width:2px
-    style B fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    style C fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
-    style D fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style A fill:#e1f5ff,stroke:#01579b,stroke-width:2px,color:#000000
+    style B fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000000
+    style C fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px,color:#000000
+    style D fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
 ```
 
 ---
@@ -76,16 +76,16 @@ graph LR
     DIGEST --> UI
     UI --> AI
     
-    style GDELT fill:#ffcdd2,stroke:#b71c1c,stroke-width:2px
-    style RSS fill:#ffcdd2,stroke:#b71c1c,stroke-width:2px
-    style PARSE1 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
-    style PARSE2 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
-    style GEOCODE fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    style NORMALIZE fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style LOGIC fill:#bbdefb,stroke:#1565c0,stroke-width:2px
-    style DIGEST fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style UI fill:#e0f2f1,stroke:#00695c,stroke-width:2px
-    style AI fill:#f1f8e9,stroke:#558b2f,stroke-width:2px
+    style GDELT fill:#ffcdd2,stroke:#b71c1c,stroke-width:2px,color:#000000
+    style RSS fill:#ffcdd2,stroke:#b71c1c,stroke-width:2px,color:#000000
+    style PARSE1 fill:#ffe0b2,stroke:#e65100,stroke-width:2px,color:#000000
+    style PARSE2 fill:#ffe0b2,stroke:#e65100,stroke-width:2px,color:#000000
+    style GEOCODE fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
+    style NORMALIZE fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style LOGIC fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000000
+    style DIGEST fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000000
+    style UI fill:#e0f2f1,stroke:#00695c,stroke-width:2px,color:#000000
+    style AI fill:#f1f8e9,stroke:#558b2f,stroke-width:2px,color:#000000
 ```
 
 ### Source 1: GDELT API
@@ -110,12 +110,12 @@ graph TD
     
     E -->|Output| F["~500-2000 events/refresh<br/>Global Coverage<br/>Sparse Outside Conflict Zones"]
     
-    style A fill:#ffcdd2,stroke:#c62828,stroke-width:2px
-    style B fill:#ffe0b2,stroke:#e65100,stroke-width:2px
-    style C fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    style D fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    style E fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style F fill:#f1f8e9,stroke:#558b2f,stroke-width:2px
+    style A fill:#ffcdd2,stroke:#c62828,stroke-width:2px,color:#000000
+    style B fill:#ffe0b2,stroke:#e65100,stroke-width:2px,color:#000000
+    style C fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
+    style D fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
+    style E fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style F fill:#f1f8e9,stroke:#558b2f,stroke-width:2px,color:#000000
 ```
 
 **Output**: ~500–2,000 events/refresh (global coverage, sparse outside conflict zones)
@@ -150,15 +150,15 @@ graph TD
     
     H -->|Output| I["~3900 articles/refresh<br/>High Regional Density<br/>77% Geocoding Success"]
     
-    style A fill:#ffcdd2,stroke:#c62828,stroke-width:2px
-    style B fill:#ffe0b2,stroke:#e65100,stroke-width:2px
-    style C fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    style D fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style E fill:#ffebee,stroke:#b71c1c,stroke-width:2px
-    style F fill:#bbdefb,stroke:#1565c0,stroke-width:2px
-    style G fill:#bbdefb,stroke:#1565c0,stroke-width:2px
-    style H fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style I fill:#f1f8e9,stroke:#558b2f,stroke-width:2px
+    style A fill:#ffcdd2,stroke:#c62828,stroke-width:2px,color:#000000
+    style B fill:#ffe0b2,stroke:#e65100,stroke-width:2px,color:#000000
+    style C fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
+    style D fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style E fill:#ffebee,stroke:#b71c1c,stroke-width:2px,color:#000000
+    style F fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000000
+    style G fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000000
+    style H fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style I fill:#f1f8e9,stroke:#558b2f,stroke-width:2px,color:#000000
 ```
 
 **Output**: ~3,900 articles/refresh (high regional density, 77% geocoding success)

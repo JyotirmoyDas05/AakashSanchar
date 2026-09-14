@@ -207,19 +207,19 @@ graph TD
     CACHE_STORE --> RESPONSE
     RESPONSE --> END
     
-    style START fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    style CACHE fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style HIT fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style MISS fill:#ffebee,stroke:#b71c1c,stroke-width:2px
-    style FETCH1 fill:#ffcdd2,stroke:#c62828,stroke-width:2px
-    style FETCH2 fill:#ffcdd2,stroke:#c62828,stroke-width:2px
-    style PARSE fill:#ffe0b2,stroke:#e65100,stroke-width:2px
-    style GEOCODE fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    style INFER fill:#bbdefb,stroke:#1565c0,stroke-width:2px
-    style NORMALIZE fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style CACHE_STORE fill:#f1f8e9,stroke:#558b2f,stroke-width:2px
-    style RESPONSE fill:#e0f2f1,stroke:#00695c,stroke-width:2px
-    style END fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style START fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000000
+    style CACHE fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
+    style HIT fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style MISS fill:#ffebee,stroke:#b71c1c,stroke-width:2px,color:#000000
+    style FETCH1 fill:#ffcdd2,stroke:#c62828,stroke-width:2px,color:#000000
+    style FETCH2 fill:#ffcdd2,stroke:#c62828,stroke-width:2px,color:#000000
+    style PARSE fill:#ffe0b2,stroke:#e65100,stroke-width:2px,color:#000000
+    style GEOCODE fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
+    style INFER fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000000
+    style NORMALIZE fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style CACHE_STORE fill:#f1f8e9,stroke:#558b2f,stroke-width:2px,color:#000000
+    style RESPONSE fill:#e0f2f1,stroke:#00695c,stroke-width:2px,color:#000000
+    style END fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000000
 ```
 
 ---
