@@ -37,9 +37,12 @@ interface CacheEntry {
   timestamp: number;
 }
 
+// Feeds + geocoding take ~10-20s on a cold instance; the platform default of
+// 10s would kill it halfway.
+export const maxDuration = 60;
+
 const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 15 * 60 * 1000;
-let fetchInProgress = false;
 let lastAttempt = 0;
 const MIN_RETRY_MS = 60_000; // 1 min between full re-fetches
 
@@ -649,116 +652,33 @@ async function fetchAllFeeds(feeds: RssFeed[]): Promise<RssArticle[]> {
   return all;
 }
 
-// ── Fallback mock articles ────────────────────────────────────────────────────
-const MOCK_ARTICLES: RssArticle[] = [
-  {
-    url: "#",
-    title: "Ongoing Geopolitical Tensions Reported Across Multiple Regions",
-    description:
-      "Multiple international observers are monitoring escalating tensions in several contested regions as diplomatic efforts continue.",
-    pubDate: new Date(Date.now() - 3_600_000).toISOString(),
-    domain: "reuters.com",
-    language: "English",
-    sourcecountry: "United States",
-  },
-  {
-    url: "#",
-    title: "International Humanitarian Response Mobilized for Disaster Zone",
-    description:
-      "Aid organizations have mobilized emergency relief teams following reports of widespread civilian displacement and infrastructure damage.",
-    pubDate: new Date(Date.now() - 7_200_000).toISOString(),
-    domain: "apnews.com",
-    language: "English",
-    sourcecountry: "United States",
-  },
-  {
-    url: "#",
-    title:
-      "UN Security Council Convenes Emergency Session on Regional Conflict",
-    description:
-      "Council members are urgently debating ceasefire mechanisms and the deployment of international peacekeeping forces.",
-    pubDate: new Date(Date.now() - 10_800_000).toISOString(),
-    domain: "bbc.com",
-    language: "English",
-    sourcecountry: "United Kingdom",
-  },
-  {
-    url: "#",
-    title: "WHO Issues Health Advisory Following Disease Outbreak Cluster",
-    description:
-      "Health authorities have identified a cluster of cases requiring immediate containment protocols and public health surveillance.",
-    pubDate: new Date(Date.now() - 14_400_000).toISOString(),
-    domain: "who.int",
-    language: "English",
-    sourcecountry: "Switzerland",
-  },
-  {
-    url: "#",
-    title: "Global Markets React to Escalating Trade and Sanctions Dispute",
-    description:
-      "Equity markets fell sharply as investors weigh the impact of new export restrictions affecting key industrial supply chains.",
-    pubDate: new Date(Date.now() - 18_000_000).toISOString(),
-    domain: "bloomberg.com",
-    language: "English",
-    sourcecountry: "United States",
-  },
-];
+// Refresh
+//
+// This used to be fire-and-forget: the handler kicked it off and returned mock
+// articles immediately. That works on a long-lived node server (the promise
+// keeps running and fills the cache for the next request) and never works on
+// Vercel, where the lambda is frozen the moment the response is sent — so the
+// cache was never populated and production served the mock set forever.
+//
+// Now: the first request on a cold instance awaits this. Concurrent requests
+// share the same in-flight promise instead of each starting their own pass.
+const inFlight = new Map<string, Promise<CacheEntry | null>>();
 
-const MOCK_ARTICLES_SOUTH_ASIA: RssArticle[] = [
-  {
-    url: "#",
-    title: "Regional Leaders Discuss Cross-Border Trade And Connectivity",
-    description:
-      "Delegates from across South Asia are reviewing trade corridors and infrastructure projects aimed at deepening regional economic integration.",
-    pubDate: new Date(Date.now() - 3_600_000).toISOString(),
-    domain: "timesofindia.indiatimes.com",
-    language: "English",
-    sourcecountry: "India",
-  },
-  {
-    url: "#",
-    title: "Monsoon Preparedness Reviewed Ahead Of Heavy Rainfall Forecast",
-    description:
-      "Disaster response agencies across the region have placed emergency teams on standby as meteorological departments forecast intense rainfall.",
-    pubDate: new Date(Date.now() - 7_200_000).toISOString(),
-    domain: "ndtv.com",
-    language: "English",
-    sourcecountry: "India",
-  },
-  {
-    url: "#",
-    title: "Border Talks Continue As Neighbours Seek Lasting Arrangements",
-    description:
-      "Diplomatic channels remain active as neighbouring states work toward agreements on border management and confidence-building measures.",
-    pubDate: new Date(Date.now() - 10_800_000).toISOString(),
-    domain: "dawn.com",
-    language: "English",
-    sourcecountry: "Pakistan",
-  },
-  {
-    url: "#",
-    title: "Bay Of Bengal Shipping Lanes Monitored After Weather Advisory",
-    description:
-      "Port authorities in Bangladesh and Sri Lanka have issued advisories as vessel traffic is rerouted ahead of deteriorating sea conditions.",
-    pubDate: new Date(Date.now() - 14_400_000).toISOString(),
-    domain: "thedailystar.net",
-    language: "English",
-    sourcecountry: "Bangladesh",
-  },
-];
+async function refresh(
+  cacheKey: string,
+  region: string,
+): Promise<CacheEntry | null> {
+  const existing = inFlight.get(cacheKey);
+  if (existing) return existing;
 
-function mockArticlesForRegion(region: string) {
-  return region === "south-asia" ? MOCK_ARTICLES_SOUTH_ASIA : MOCK_ARTICLES;
-}
-
-// Background refresh
-async function triggerBackgroundRefresh(cacheKey: string, region: string) {
-  if (fetchInProgress) return;
-  fetchInProgress = true;
-  lastAttempt = Date.now();
-  try {
-    const articles = await fetchAllFeeds(feedsForRegion(region));
-    if (articles.length > 0) {
+  const run = (async (): Promise<CacheEntry | null> => {
+    lastAttempt = Date.now();
+    try {
+      const articles = await fetchAllFeeds(feedsForRegion(region));
+      if (articles.length === 0) {
+        console.warn("[RSS Articles] All feeds returned empty");
+        return null;
+      }
       // One pass over the geocoded set, once per refresh. This is the whole
       // "server-side precompute" — no cron, no database, no per-request cost.
       const digests = buildLocationDigests(
@@ -778,23 +698,35 @@ async function triggerBackgroundRefresh(cacheKey: string, region: string) {
             intensity: 0.6,
           })),
       );
-      cache.set(cacheKey, { articles, digests, timestamp: Date.now() });
+      const entry: CacheEntry = { articles, digests, timestamp: Date.now() };
+      cache.set(cacheKey, entry);
       console.log(
         `[RSS Articles] Cached ${articles.length} articles, ${digests.length} location digests (${region})`,
       );
-    } else {
-      console.warn("[RSS Articles] All feeds returned empty, retrying in 60s");
-      setTimeout(() => {
-        fetchInProgress = false;
-        triggerBackgroundRefresh(cacheKey, region).catch(() => {});
-      }, MIN_RETRY_MS);
-      return;
+      return entry;
+    } catch (err) {
+      console.error("[RSS Articles] Error:", err);
+      return null;
     }
-  } catch (err) {
-    console.error("[RSS Articles] Error:", err);
-  } finally {
-    fetchInProgress = false;
-  }
+  })();
+
+  // Registered before the cleanup is attached: if the body ever threw
+  // synchronously, a `finally` inside it would delete the entry before this set
+  // and wedge every later request on a dead promise.
+  inFlight.set(cacheKey, run);
+  void run.finally(() => inFlight.delete(cacheKey));
+  return run;
+}
+
+function payload(entry: CacheEntry, stale: boolean) {
+  return NextResponse.json({
+    articles: entry.articles,
+    locations: entry.digests,
+    cached: true,
+    stale,
+    cachedAt: new Date(entry.timestamp).toISOString(),
+    count: entry.articles.length,
+  });
 }
 
 // Route handler
@@ -808,30 +740,33 @@ export async function GET(request: NextRequest) {
 
   // Fresh cache → return immediately
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return NextResponse.json({
-      articles: cached.articles,
-      locations: cached.digests,
-      cached: true,
-      cachedAt: new Date(cached.timestamp).toISOString(),
-      count: cached.articles.length,
-    });
+    return payload(cached, false);
   }
 
-  // Trigger background refresh if not recently attempted
-  if (!fetchInProgress && Date.now() - lastAttempt > MIN_RETRY_MS) {
-    triggerBackgroundRefresh(cacheKey, region).catch(() => {});
+  // Stale but usable → serve it now and refresh behind it. Safe to not await:
+  // if the lambda freezes mid-refresh we still served real data, and the next
+  // cold instance takes the awaited path below.
+  if (cached) {
+    if (Date.now() - lastAttempt > MIN_RETRY_MS) {
+      refresh(cacheKey, region).catch(() => {});
+    }
+    return payload(cached, true);
   }
 
-  // Return stale cache or mock — always 200
-  const fallback = cached?.articles ?? mockArticlesForRegion(region);
+  // Nothing cached at all. Await — returning an empty set here is what made
+  // production look permanently empty.
+  const entry = await refresh(cacheKey, region);
+  if (entry) return payload(entry, false);
+
+  // Every feed failed. Say so honestly rather than inventing headlines: the
+  // client draws no markers and the ticker shows its own status line.
   return NextResponse.json({
-    articles: fallback,
-    locations: cached?.digests ?? [],
-    cached: true,
+    articles: [],
+    locations: [],
+    cached: false,
     stale: true,
-    cachedAt: cached
-      ? new Date(cached.timestamp).toISOString()
-      : new Date().toISOString(),
-    count: fallback.length,
+    error: "upstream feeds unavailable",
+    cachedAt: new Date().toISOString(),
+    count: 0,
   });
 }

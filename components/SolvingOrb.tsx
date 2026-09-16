@@ -31,7 +31,7 @@ function solveCycle(
   time: number,
   count: number,
   slotDur: number,
-  rest: number
+  rest: number,
 ): { amount: number[]; active: number } {
   const cyc = 2 * count * slotDur + rest;
   const tc = time % cyc;
@@ -59,7 +59,7 @@ function solveCycle(
 function applyMoves(
   pt: [number, number, number],
   moves: Move[],
-  sc: { amount: number[]; active: number }
+  sc: { amount: number[]; active: number },
 ): [number, number, number, boolean] {
   let [x, y, z] = pt;
   let inActive = false;
@@ -164,7 +164,7 @@ function paintDots(
   cx: number,
   cy: number,
   dark: boolean,
-  color: [number, number, number]
+  color: [number, number, number],
 ) {
   const [r, g, b] = color;
   for (const d of dots) {

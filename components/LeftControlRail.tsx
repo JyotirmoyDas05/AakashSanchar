@@ -216,7 +216,7 @@ export default function LeftControlRail({
   // 2. Fixed Sidebar Mode (Classic style)
   return (
     <div
-      className={`flex h-full w-14 flex-col items-center py-3 border-r select-none shrink-0 z-1050 transition-all duration-300 ease-in-out ${
+      className={`flex h-full w-12 md:w-14 flex-col items-center py-3 border-r select-none shrink-0 z-1050 transition-all duration-300 ease-in-out ${
         isLight
           ? "bg-white border-slate-200 text-slate-700 shadow-md"
           : "bg-[#0a0a0a] border-brand-border text-slate-400"
@@ -231,7 +231,7 @@ export default function LeftControlRail({
               key={w.id}
               type="button"
               onClick={() => onToggleWidget(w.id)}
-              className={`relative flex h-10 w-10 items-center justify-center rounded transition-all group ${
+              className={`relative flex h-11 w-11 md:h-10 md:w-10 items-center justify-center rounded transition-all group ${
                 isActive
                   ? isLight
                     ? "bg-cyan-50 text-cyan-800 border border-cyan-400 shadow-sm font-bold"
@@ -245,7 +245,7 @@ export default function LeftControlRail({
               {w.icon}
               {/* Tooltip hint */}
               <div
-                className={`absolute left-12 scale-0 group-hover:scale-100 transition-transform origin-left z-50 text-[9px] font-bold tracking-wider rounded px-2 py-1 uppercase whitespace-nowrap border ${
+                className={`absolute left-12 scale-0 md:group-hover:scale-100 transition-transform origin-left z-50 text-[9px] font-bold tracking-wider rounded px-2 py-1 uppercase whitespace-nowrap border ${
                   isLight
                     ? "bg-white border-slate-300 text-slate-800 shadow-lg"
                     : "bg-[#0d0d0e] border-[#222] text-slate-300 shadow-xl"

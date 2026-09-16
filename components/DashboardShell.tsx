@@ -122,14 +122,14 @@ export default function DashboardShell({
     >
       {/* 1. Header Navigation Bar */}
       <header
-        className={`h-12 border-b flex items-center justify-between px-4 shrink-0 z-40 font-mono relative ${
+        className={`h-12 border-b flex items-center justify-between px-2 sm:px-4 shrink-0 z-40 font-mono relative ${
           isLight
             ? "bg-white border-slate-200 text-slate-900 shadow-sm"
             : "bg-[#0a0a0a] border-brand-border text-slate-200"
         }`}
       >
         {/* Left: Logo + Tabs — natural width */}
-        <div className="flex items-center gap-6 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-6 shrink-0 min-w-0">
           {/* Logo */}
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_#06b6d4]" />
@@ -149,7 +149,7 @@ export default function DashboardShell({
                 key={tab}
                 type="button"
                 onClick={() => onTabChange(tab)}
-                className={`px-3.5 py-1 text-[10px] font-bold tracking-widest uppercase transition-all border ${
+                className={`px-2 sm:px-3.5 py-1.5 text-[10px] font-bold tracking-widest uppercase transition-all border ${
                   activeTab === tab
                     ? isLight
                       ? "bg-cyan-50 border-cyan-300 text-cyan-800 font-bold shadow-sm"
@@ -164,6 +164,36 @@ export default function DashboardShell({
             ))}
           </div>
         </div>
+
+        {/* Mobile: icon-only search. The wide pill below needs room it does not
+            have on a phone, but search must not simply vanish. */}
+        {onToggleSearch && (
+          <button
+            type="button"
+            onClick={onToggleSearch}
+            aria-label="Search intelligence"
+            className={`sm:hidden flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
+              isLight
+                ? "bg-slate-100 border-slate-300 text-slate-600 active:bg-slate-200"
+                : "bg-[#141416] border-[#2b2b30] text-slate-400 active:bg-[#1c1c20]"
+            }`}
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="m21 21-4.3-4.3"
+              />
+            </svg>
+          </button>
+        )}
 
         {/* Middle: Command Palette — absolutely centered so it never shifts */}
         {onToggleSearch && (
@@ -225,7 +255,7 @@ export default function DashboardShell({
         <aside
           className={`h-full z-1050 transition-all duration-300 ease-in-out ${
             layoutMode === "sidebar"
-              ? "w-14 shrink-0"
+              ? "w-12 md:w-14 shrink-0"
               : "w-0 overflow-visible relative"
           }`}
         >
@@ -239,11 +269,11 @@ export default function DashboardShell({
 
             {/* Bottom Right Map Actions Overlay (Locate / Filter / Settings widgets) */}
             {activeTab === "map" && (
-              <div className="absolute bottom-4 right-4 z-1050 flex items-center gap-1.5 font-mono text-[9px] font-bold">
+              <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-1050 flex items-center gap-1.5 font-mono text-[9px] font-bold">
                 <button
                   type="button"
                   onClick={onToggleLocate}
-                  className={`rounded border px-2.5 py-1.5 transition-all flex items-center gap-1.5 ${
+                  className={`rounded border px-2.5 py-2.5 sm:py-1.5 min-h-9 sm:min-h-0 transition-all flex items-center gap-1.5 ${
                     isLocateOpen
                       ? isLight
                         ? "border-cyan-600 bg-cyan-100/90 text-cyan-900 shadow-md font-bold"
@@ -266,13 +296,13 @@ export default function DashboardShell({
                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
                   </svg>
-                  LOCATE
+                  <span className="hidden sm:inline">LOCATE</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={onToggleFilter}
-                  className={`rounded border px-2.5 py-1.5 transition-all flex items-center gap-1.5 ${
+                  className={`rounded border px-2.5 py-2.5 sm:py-1.5 min-h-9 sm:min-h-0 transition-all flex items-center gap-1.5 ${
                     isFilterOpen
                       ? isLight
                         ? "border-cyan-600 bg-cyan-100/90 text-cyan-900 shadow-md font-bold"
@@ -295,14 +325,14 @@ export default function DashboardShell({
                       d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.707 7.293A1 1 0 013 6.586V4z"
                     />
                   </svg>
-                  FILTER
+                  <span className="hidden sm:inline">FILTER</span>
                 </button>
 
                 {onToggleSettings && (
                   <button
                     type="button"
                     onClick={onToggleSettings}
-                    className={`rounded border px-2.5 py-1.5 transition-all flex items-center gap-1.5 ${
+                    className={`rounded border px-2.5 py-2.5 sm:py-1.5 min-h-9 sm:min-h-0 transition-all flex items-center gap-1.5 ${
                       isSettingsOpen
                         ? isLight
                           ? "border-cyan-600 bg-cyan-100/90 text-cyan-900 shadow-md font-bold"
@@ -330,7 +360,7 @@ export default function DashboardShell({
                         d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                       />
                     </svg>
-                    SETTINGS
+                    <span className="hidden sm:inline">SETTINGS</span>
                   </button>
                 )}
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { deriveTag } from "@/lib/deriveTags";
 import { detectSourceLang } from "@/lib/detectLang";
 import { formatTime } from "@/lib/formatTime";
@@ -12,6 +13,17 @@ import {
 import { annotateArticleWithLLM } from "@/lib/webLLM";
 import type { NewsCategory, NewsEvent } from "@/types/news";
 import { SolvingOrb } from "./SolvingOrb";
+
+/** Headline scroll speed. Readable without being sleepy. */
+const MARQUEE_PX_PER_SEC = 70;
+
+/**
+ * Newest N headlines only. At a constant scroll speed the full cycle length is
+ * proportional to the item count, so an uncapped wire (180+ articles) takes a
+ * quarter of an hour to come round. This is the *breaking* ticker — the wire
+ * panel is where the full corpus is browsable.
+ */
+const MARQUEE_MAX_ITEMS = 40;
 
 interface BreakingTickerProps {
   events: NewsEvent[];
@@ -30,11 +42,18 @@ export default function BreakingTicker({
   theme = "dark",
 }: BreakingTickerProps) {
   const isLight = theme === "light";
+  const isMobile = useIsMobile();
   const [hoveredEvent, setHoveredEvent] = useState<NewsEvent | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{
     left: number;
   } | null>(null);
   const [isMarqueeHovered, setIsMarqueeHovered] = useState(false);
+  // Scroll speed is a constant px/s, derived from how wide one copy of the
+  // headline strip actually is. The old duration was `items * 15s`, which is a
+  // proxy for width that gets it badly wrong at both ends: 5 items crawled and
+  // 200 items took nearly an hour to come round.
+  const loopRef = useRef<HTMLSpanElement | null>(null);
+  const [loopWidth, setLoopWidth] = useState(0);
   const [isTooltipHovered, setIsTooltipHovered] = useState(false);
 
   const [translatedOverrides, setTranslatedOverrides] = useState<
@@ -55,6 +74,16 @@ export default function BreakingTicker({
   const hoveredEventId = hoveredEvent?.id;
 
   // Reset or load cached translation whenever hovered article changes
+  useEffect(() => {
+    const el = loopRef.current;
+    if (!el) return;
+    const measure = () => setLoopWidth(el.scrollWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   useEffect(() => {
     if (!hoveredEventId) {
       setTranslatedTitle(null);
@@ -295,7 +324,8 @@ export default function BreakingTicker({
     },
   ];
 
-  const displayEvents = events.length > 0 ? events : mockSystemEvents;
+  const displayEvents =
+    events.length > 0 ? events.slice(0, MARQUEE_MAX_ITEMS) : mockSystemEvents;
 
   function getEventTitle(e: NewsEvent): string {
     return translatedOverrides[e.id]?.title ?? e.title;
@@ -330,6 +360,20 @@ export default function BreakingTicker({
       setHoveredEvent(null);
       setTooltipPosition(null);
     }, 180);
+  };
+
+  // Touch devices never fire mouseenter, so the headline card was unreachable on
+  // a phone. Tap opens it; tapping the same headline again dismisses it.
+  const handleItemTap = (
+    event: NewsEvent,
+    e: React.MouseEvent<HTMLSpanElement>,
+  ) => {
+    if (hoveredEvent?.id === event.id) {
+      setHoveredEvent(null);
+      setTooltipPosition(null);
+      return;
+    }
+    handleItemMouseEnter(event, e);
   };
 
   const handleItemMouseEnter = (
@@ -372,7 +416,8 @@ export default function BreakingTicker({
 
   return (
     <div
-      className={`ticker-container relative h-7 border-t flex items-center z-2000 select-none font-mono text-[10px] shrink-0 ${
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className={`ticker-container relative h-7 border-t flex items-center z-2000 select-none font-mono text-[10px] shrink-0 box-content ${
         isLight
           ? "bg-white border-slate-200 text-slate-800 shadow-sm"
           : "bg-brand-bg border-brand-border text-brand-text-secondary"
@@ -401,12 +446,12 @@ export default function BreakingTicker({
             isLight ? "text-slate-800" : "text-brand-text-secondary"
           }`}
           style={{
-            animationDuration: `${Math.max(60, displayEvents.length * 15)}s`,
+            animationDuration: `${Math.max(20, loopWidth / MARQUEE_PX_PER_SEC)}s`,
             animationPlayState: isPaused ? "paused" : "running",
           }}
         >
           {/* First loop block */}
-          <span className="inline-flex items-center shrink-0">
+          <span ref={loopRef} className="inline-flex items-center shrink-0">
             {displayEvents.map((e) => (
               <span
                 key={`${e.id}-loop1`}
@@ -414,6 +459,7 @@ export default function BreakingTicker({
                   isLight ? "hover:text-cyan-800" : "hover:text-white"
                 }`}
                 onMouseEnter={(evt) => handleItemMouseEnter(e, evt)}
+                onClick={(evt) => handleItemTap(e, evt)}
               >
                 <span
                   className={`${
@@ -446,6 +492,7 @@ export default function BreakingTicker({
                 key={`${e.id}-loop2`}
                 className="inline-flex items-center cursor-pointer hover:text-white transition-colors"
                 onMouseEnter={(evt) => handleItemMouseEnter(e, evt)}
+                onClick={(evt) => handleItemTap(e, evt)}
               >
                 <span
                   className={`${BUCKET_TEXT_CLASS[getEventBucket(e)] || "text-brand-text-secondary"} font-bold select-none text-[9px] tracking-wide mr-1.5`}
@@ -469,8 +516,8 @@ export default function BreakingTicker({
       {/* Hover Modal */}
       {hoveredEvent && tooltipPosition && (
         <div
-          style={{ left: tooltipPosition.left }}
-          className={`absolute bottom-full mb-3 -translate-x-1/2 rounded-lg z-2100 shadow-2xl w-115 pointer-events-auto flex flex-col transition-all duration-150 overflow-hidden font-mono border ${
+          style={{ left: isMobile ? "50%" : tooltipPosition.left }}
+          className={`absolute bottom-full mb-3 -translate-x-1/2 rounded-lg z-2100 shadow-2xl w-[min(28.75rem,calc(100vw-1.5rem))] pointer-events-auto flex flex-col transition-all duration-150 overflow-hidden font-mono border ${
             isLight
               ? "bg-white/98 text-slate-900 border-slate-300 shadow-[0_8px_32px_rgba(0,0,0,0.15)]"
               : "bg-brand-panel backdrop-blur-xl border-brand-border text-brand-text-primary shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_20px_rgba(6,182,212,0.05)]"

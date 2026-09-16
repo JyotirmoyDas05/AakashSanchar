@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import ResizeHandles from "./ResizeHandles";
 
 interface FloatingWindowProps {
@@ -35,6 +36,7 @@ export default function FloatingWindow({
   children,
 }: FloatingWindowProps) {
   const isLight = theme === "light";
+  const isMobile = useIsMobile();
   const [position, setPosition] = useState(defaultPosition);
   const [size, setSize] = useState(defaultSize);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -45,7 +47,7 @@ export default function FloatingWindow({
   const startPos = useRef({ x: 0, y: 0 });
 
   // Dragging handlers
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: PointerEvent) => {
     if (!isDragging.current) return;
     const dx = e.clientX - dragStart.current.x;
     const dy = e.clientY - dragStart.current.y;
@@ -60,12 +62,13 @@ export default function FloatingWindow({
       isDragging.current = false;
       setIsInteracting(false);
     }
-    document.removeEventListener("mousemove", handleMouseMove);
-    document.removeEventListener("mouseup", handleMouseUp);
+    document.removeEventListener("pointermove", handleMouseMove);
+    document.removeEventListener("pointerup", handleMouseUp);
+    document.removeEventListener("pointercancel", handleMouseUp);
   }, [handleMouseMove]);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isMaximized) return; // Disable dragging when maximized
+  const handleMouseDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isMaximized || isMobile) return; // Maximized and sheet mode do not drag
     if (e.button !== 0) return; // Left click only
     const target = e.target as HTMLElement;
     if (
@@ -81,49 +84,79 @@ export default function FloatingWindow({
     dragStart.current = { x: e.clientX, y: e.clientY };
     startPos.current = { x: position.x, y: position.y };
 
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("pointermove", handleMouseMove);
+    document.addEventListener("pointerup", handleMouseUp);
+    document.addEventListener("pointercancel", handleMouseUp);
   };
 
   useEffect(() => {
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("pointermove", handleMouseMove);
+      document.removeEventListener("pointerup", handleMouseUp);
+      document.removeEventListener("pointercancel", handleMouseUp);
     };
   }, [handleMouseMove, handleMouseUp]);
+
+  // On a phone the floating-window metaphor breaks down: a 480px panel pinned at
+  // x=240 is simply off-screen. Below `md` every panel becomes a bottom sheet —
+  // full width, anchored to the bottom edge, no drag and no resize.
+  const sheetStyle: React.CSSProperties = {
+    position: "fixed",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    top: "auto",
+    width: "100%",
+    maxHeight: "85dvh",
+    height: isMaximized ? "85dvh" : Math.min(size.height, 560),
+    paddingBottom: "env(safe-area-inset-bottom)",
+    zIndex: zIndex + 10,
+  };
 
   return (
     <div
       onMouseDownCapture={onFocus}
-      className={`absolute border font-mono select-none overflow-hidden flex flex-col rounded-lg ${
+      className={`border font-mono select-none overflow-hidden flex flex-col ${
+        isMobile ? "rounded-t-2xl" : "absolute rounded-lg"
+      } ${
         isLight
           ? "border-slate-300 bg-white/95 text-slate-900 shadow-xl backdrop-blur-md"
           : "border-brand-border bg-brand-bg/95 text-slate-200 shadow-2xl backdrop-blur-md"
       } ${isInteracting ? "transition-none" : "transition-all duration-150"}`}
       style={
-        isMaximized
-          ? {
-              left: layoutMode === "sidebar" ? "calc(3.5rem + 2rem)" : "2rem",
-              top: "2rem",
-              width:
-                layoutMode === "sidebar"
-                  ? "calc(100% - 7.5rem)"
-                  : "calc(100% - 4rem)",
-              height: "calc(100% - 4rem)",
-              zIndex: zIndex + 10,
-            }
-          : {
-              left: `${position.x}px`,
-              top: `${position.y}px`,
-              width: `${size.width}px`,
-              height: `${size.height}px`,
-              zIndex: zIndex,
-            }
+        isMobile
+          ? sheetStyle
+          : isMaximized
+            ? {
+                left: layoutMode === "sidebar" ? "calc(3.5rem + 2rem)" : "2rem",
+                top: "2rem",
+                width:
+                  layoutMode === "sidebar"
+                    ? "calc(100% - 7.5rem)"
+                    : "calc(100% - 4rem)",
+                height: "calc(100% - 4rem)",
+                zIndex: zIndex + 10,
+              }
+            : {
+                left: `${position.x}px`,
+                top: `${position.y}px`,
+                width: `${size.width}px`,
+                height: `${size.height}px`,
+                zIndex: zIndex,
+              }
       }
     >
+      {/* Sheet grab bar — affordance only; the close button does the work. */}
+      {isMobile && (
+        <div className="flex justify-center pt-2 pb-1 shrink-0">
+          <span
+            className={`h-1 w-9 rounded-full ${isLight ? "bg-slate-300" : "bg-[#333]"}`}
+          />
+        </div>
+      )}
       {/* Title bar */}
       <div
-        onMouseDown={handleMouseDown}
+        onPointerDown={handleMouseDown}
         className={`flex items-center justify-between border-b px-3 py-2 shrink-0 cursor-grab active:cursor-grabbing select-none ${
           isLight
             ? "bg-slate-100 border-slate-200"
@@ -201,7 +234,7 @@ export default function FloatingWindow({
         {children}
       </div>
 
-      {!isMaximized && (
+      {!isMaximized && !isMobile && (
         <ResizeHandles
           size={size}
           position={position}

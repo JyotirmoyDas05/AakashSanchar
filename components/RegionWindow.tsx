@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import {
   type StrategicAnalysisPillars,
   synthesizeRegionIntelligence,
@@ -208,6 +209,7 @@ export default function RegionWindow({
   layoutMode = "sidebar",
 }: RegionWindowProps) {
   const isLight = theme === "light";
+  const isMobile = useIsMobile();
   const [position, setPosition] = useState(defaultPosition);
   const [size, setSize] = useState(() => ({
     width: 350,
@@ -368,7 +370,7 @@ export default function RegionWindow({
   }, [eventTimes]);
 
   const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
+    (e: PointerEvent) => {
       if (!isDragging.current) return;
       const dx = e.clientX - dragStart.current.x;
       const dy = e.clientY - dragStart.current.y;
@@ -391,51 +393,69 @@ export default function RegionWindow({
     setIsInteracting(false);
   }, []);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (isMaximized || isMinimized || e.button !== 0) return;
+  const handleMouseDown = (e: React.PointerEvent) => {
+    if (isMaximized || isMinimized || isMobile || e.button !== 0) return;
     if ((e.target as HTMLElement).closest("button")) return;
     isDragging.current = true;
     setIsInteracting(true);
     dragStart.current = { x: e.clientX, y: e.clientY };
     startPos.current = { x: position.x, y: position.y };
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("pointermove", handleMouseMove);
+    document.addEventListener("pointerup", handleMouseUp);
+    document.addEventListener("pointercancel", handleMouseUp);
   };
 
   useEffect(
     () => () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("pointermove", handleMouseMove);
+      document.removeEventListener("pointerup", handleMouseUp);
+      document.removeEventListener("pointercancel", handleMouseUp);
     },
     [handleMouseMove, handleMouseUp],
   );
 
-  const wrapStyle: React.CSSProperties = isMaximized
+  // Phone: bottom sheet instead of a 350px panel pinned at an arbitrary x/y.
+  const wrapStyle: React.CSSProperties = isMobile
     ? {
         position: "fixed",
-        left: layoutMode === "sidebar" ? "calc(3.5rem + 2rem)" : "2rem",
-        top: "3.5rem",
-        width:
-          layoutMode === "sidebar"
-            ? "calc(100% - 7.5rem)"
-            : "calc(100% - 4rem)",
-        height: "calc(100% - 6rem)",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        top: "auto",
+        width: "100%",
+        maxHeight: "85dvh",
+        height: isMinimized ? undefined : "85dvh",
+        paddingBottom: "env(safe-area-inset-bottom)",
         zIndex: zIndex + 10,
       }
-    : {
-        position: "fixed",
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        width: `${size.width}px`,
-        height: isMinimized ? undefined : `${size.height}px`,
-        zIndex,
-      };
+    : isMaximized
+      ? {
+          position: "fixed",
+          left: layoutMode === "sidebar" ? "calc(3.5rem + 2rem)" : "2rem",
+          top: "3.5rem",
+          width:
+            layoutMode === "sidebar"
+              ? "calc(100% - 7.5rem)"
+              : "calc(100% - 4rem)",
+          height: "calc(100% - 6rem)",
+          zIndex: zIndex + 10,
+        }
+      : {
+          position: "fixed",
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          width: `${size.width}px`,
+          height: isMinimized ? undefined : `${size.height}px`,
+          zIndex,
+        };
 
   return (
     <div
       onMouseDownCapture={onFocus}
       style={wrapStyle}
-      className={`rounded-lg border font-mono select-none flex flex-col overflow-hidden ${
+      className={`border font-mono select-none flex flex-col overflow-hidden ${
+        isMobile ? "rounded-t-2xl" : "rounded-lg"
+      } ${
         isLight
           ? "border-slate-300 bg-white text-slate-900 shadow-xl"
           : "border-[#222] bg-brand-bg/95 text-slate-200 shadow-2xl backdrop-blur-md"
@@ -443,9 +463,17 @@ export default function RegionWindow({
         isInteracting ? "transition-none" : "transition-[left,top] duration-100"
       }`}
     >
+      {isMobile && (
+        <div className="flex justify-center pt-2 pb-1 shrink-0">
+          <span
+            className={`h-1 w-9 rounded-full ${isLight ? "bg-slate-300" : "bg-[#333]"}`}
+          />
+        </div>
+      )}
+
       {/* Title bar */}
       <div
-        onMouseDown={handleMouseDown}
+        onPointerDown={handleMouseDown}
         className={`flex items-center justify-between border-b px-3 py-2 shrink-0 cursor-grab active:cursor-grabbing rounded-t-lg ${
           isLight
             ? "bg-slate-100 border-slate-200 text-slate-900"
@@ -918,7 +946,7 @@ export default function RegionWindow({
         </div>
       )}
 
-      {!isMaximized && !isMinimized && (
+      {!isMaximized && !isMinimized && !isMobile && (
         <ResizeHandles
           size={size}
           position={position}

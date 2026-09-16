@@ -34,7 +34,7 @@ export default function ResizeHandles({
   const startPos = useRef({ x: 0, y: 0 });
 
   const onMove = useCallback(
-    (e: MouseEvent) => {
+    (e: PointerEvent) => {
       if (!isResizing.current) return;
       const dx = e.clientX - start.current.x;
       const dy = e.clientY - start.current.y;
@@ -70,11 +70,12 @@ export default function ResizeHandles({
       isResizing.current = false;
       onInteractingChange?.(false);
     }
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onUp);
   }, [onMove, onInteractingChange]);
 
-  const onDown = (e: React.MouseEvent, dir: string) => {
+  const onDown = (e: React.PointerEvent, dir: string) => {
     e.preventDefault();
     e.stopPropagation();
     isResizing.current = true;
@@ -83,14 +84,16 @@ export default function ResizeHandles({
     start.current = { x: e.clientX, y: e.clientY };
     startSize.current = { width: size.width, height: size.height };
     startPos.current = { x: position.x, y: position.y };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onUp);
   };
 
   useEffect(
     () => () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onUp);
     },
     [onMove, onUp],
   );
@@ -99,8 +102,9 @@ export default function ResizeHandles({
     <div
       key={dir}
       data-resize-handle="true"
-      onMouseDown={(e) => onDown(e, dir)}
+      onPointerDown={(e) => onDown(e, dir)}
       className={className}
+      style={{ touchAction: "none" }}
     />
   );
 

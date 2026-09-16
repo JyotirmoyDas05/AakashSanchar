@@ -280,7 +280,7 @@ export default function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-9999 flex items-start justify-center bg-black/50 pt-[10dvh] backdrop-blur-sm"
+      className="fixed inset-0 z-9999 flex items-start justify-center bg-black/50 px-3 pt-[6dvh] sm:pt-[10dvh] backdrop-blur-sm"
       onClick={onClose}
     >
       <div
