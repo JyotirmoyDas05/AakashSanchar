@@ -172,7 +172,7 @@ export default function LeftControlRail({
               key={w.id}
               type="button"
               onClick={() => onToggleWidget(w.id)}
-              className={`relative flex h-8 w-full items-center justify-between px-2.5 rounded transition-all group border font-mono text-[10px] tracking-wider uppercase ${
+              className={`relative flex h-11 md:h-8 w-full items-center justify-between px-2.5 rounded transition-all group border font-mono text-[10px] tracking-wider uppercase ${
                 isActive
                   ? isLight
                     ? "bg-cyan-100 border-cyan-500 text-cyan-900 font-bold shadow-sm"
@@ -197,15 +197,11 @@ export default function LeftControlRail({
                 >
                   {w.icon}
                 </span>
-                <span className="font-bold hidden md:inline">{w.label}</span>
+                <span className="font-bold">{w.label}</span>
               </div>
               <span className="hidden md:inline text-[9px] tabular-nums text-slate-500 opacity-60 group-hover:opacity-100 transition-opacity">
                 {w.shortcut}
               </span>
-              {/* Mobile Active Indicator Dot */}
-              {isActive && (
-                <div className="md:hidden absolute -bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
-              )}
             </button>
           );
         })}

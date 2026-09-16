@@ -108,9 +108,14 @@ export default function FloatingWindow({
     top: "auto",
     width: "100%",
     maxHeight: "85dvh",
-    height: isMaximized ? "85dvh" : Math.min(size.height, 560),
+    // Uniform height so a stack of sheets fully occludes: with per-window
+    // heights the taller one behind peeks out above the front one's header.
+    height: "85dvh",
     paddingBottom: "env(safe-area-inset-bottom)",
-    zIndex: zIndex + 10,
+    // Desktop stacking values go as low as 50, which puts a sheet *underneath*
+    // the z-1050 control rail. Sheets are modal on mobile - always clear it,
+    // while keeping relative order between sheets.
+    zIndex: Math.max(zIndex + 10, 1200),
   };
 
   return (
@@ -183,6 +188,7 @@ export default function FloatingWindow({
                 ? "text-slate-600 hover:text-slate-900 hover:bg-slate-200"
                 : "text-slate-400 hover:text-white hover:bg-white/10"
             }`}
+            aria-label={isMaximized ? "Restore" : "Maximize"}
             title={isMaximized ? "Restore" : "Maximize"}
           >
             {isMaximized ? (
@@ -218,6 +224,7 @@ export default function FloatingWindow({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className={`rounded w-6 h-6 flex items-center justify-center text-xs transition-colors ${
               isLight
                 ? "text-slate-600 hover:text-slate-900 hover:bg-slate-200"

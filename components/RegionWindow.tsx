@@ -426,7 +426,7 @@ export default function RegionWindow({
         maxHeight: "85dvh",
         height: isMinimized ? undefined : "85dvh",
         paddingBottom: "env(safe-area-inset-bottom)",
-        zIndex: zIndex + 10,
+        zIndex: Math.max(zIndex + 10, 1200),
       }
     : isMaximized
       ? {

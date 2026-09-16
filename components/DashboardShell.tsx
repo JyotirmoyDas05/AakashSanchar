@@ -149,7 +149,7 @@ export default function DashboardShell({
                 key={tab}
                 type="button"
                 onClick={() => onTabChange(tab)}
-                className={`px-2 sm:px-3.5 py-1.5 text-[10px] font-bold tracking-widest uppercase transition-all border ${
+                className={`px-3 sm:px-3.5 py-2.5 sm:py-1.5 min-h-11 sm:min-h-0 text-[10px] font-bold tracking-widest uppercase transition-all border ${
                   activeTab === tab
                     ? isLight
                       ? "bg-cyan-50 border-cyan-300 text-cyan-800 font-bold shadow-sm"
@@ -172,7 +172,7 @@ export default function DashboardShell({
             type="button"
             onClick={onToggleSearch}
             aria-label="Search intelligence"
-            className={`sm:hidden flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
+            className={`sm:hidden flex h-11 w-11 items-center justify-center rounded-md border transition-colors ${
               isLight
                 ? "bg-slate-100 border-slate-300 text-slate-600 active:bg-slate-200"
                 : "bg-[#141416] border-[#2b2b30] text-slate-400 active:bg-[#1c1c20]"
@@ -223,7 +223,7 @@ export default function DashboardShell({
                 />
               </svg>
               <span className="text-[11px] font-medium tracking-wide">
-                Search intelligence, regions, threats...
+                Search intelligence, regions, threats…
               </span>
               <kbd
                 className={`ml-2 px-1.5 py-0.5 text-[9px] font-mono font-bold rounded border ${
@@ -273,7 +273,8 @@ export default function DashboardShell({
                 <button
                   type="button"
                   onClick={onToggleLocate}
-                  className={`rounded border px-2.5 py-2.5 sm:py-1.5 min-h-9 sm:min-h-0 transition-all flex items-center gap-1.5 ${
+                  aria-label="Locate"
+                  className={`rounded border px-3 sm:px-2.5 py-2.5 sm:py-1.5 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 justify-center transition-all flex items-center gap-1.5 ${
                     isLocateOpen
                       ? isLight
                         ? "border-cyan-600 bg-cyan-100/90 text-cyan-900 shadow-md font-bold"
@@ -302,7 +303,8 @@ export default function DashboardShell({
                 <button
                   type="button"
                   onClick={onToggleFilter}
-                  className={`rounded border px-2.5 py-2.5 sm:py-1.5 min-h-9 sm:min-h-0 transition-all flex items-center gap-1.5 ${
+                  aria-label="Filter"
+                  className={`rounded border px-3 sm:px-2.5 py-2.5 sm:py-1.5 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 justify-center transition-all flex items-center gap-1.5 ${
                     isFilterOpen
                       ? isLight
                         ? "border-cyan-600 bg-cyan-100/90 text-cyan-900 shadow-md font-bold"
@@ -332,7 +334,8 @@ export default function DashboardShell({
                   <button
                     type="button"
                     onClick={onToggleSettings}
-                    className={`rounded border px-2.5 py-2.5 sm:py-1.5 min-h-9 sm:min-h-0 transition-all flex items-center gap-1.5 ${
+                    aria-label="Settings"
+                    className={`rounded border px-3 sm:px-2.5 py-2.5 sm:py-1.5 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 justify-center transition-all flex items-center gap-1.5 ${
                       isSettingsOpen
                         ? isLight
                           ? "border-cyan-600 bg-cyan-100/90 text-cyan-900 shadow-md font-bold"

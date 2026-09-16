@@ -118,7 +118,7 @@ export default function WireWorkspace({
           <button
             type="button"
             onClick={() => setActiveCategory("all")}
-            className={`rounded px-2.5 py-1 text-[9px] font-bold uppercase transition-all ${
+            className={`rounded px-3 py-2 sm:px-2.5 sm:py-1 text-[9px] font-bold uppercase transition-all ${
               activeCategory === "all"
                 ? isLight
                   ? "bg-cyan-100 text-cyan-900 border border-cyan-400 font-bold shadow-sm"
@@ -143,7 +143,7 @@ export default function WireWorkspace({
               key={cat}
               type="button"
               onClick={() => setActiveCategory(cat)}
-              className={`rounded px-2.5 py-1 text-[9px] font-bold uppercase transition-all ${
+              className={`rounded px-3 py-2 sm:px-2.5 sm:py-1 text-[9px] font-bold uppercase transition-all ${
                 activeCategory === cat
                   ? isLight
                     ? "bg-cyan-100 text-cyan-900 border border-cyan-400 font-bold shadow-sm"
